@@ -234,7 +234,7 @@ async function executeFetch<TContext>(
     const representationToEntity: number[] = [];
 
     entities.forEach((entity, index) => {
-      const representation = executeSelectionSet(entity, requires);
+      const representation = executeSelectionSet(entity, requires, context);
       if (representation && representation[TypeNameMetaFieldDef.name]) {
         representations.push(representation);
         representationToEntity.push(index);
@@ -385,9 +385,10 @@ async function executeFetch<TContext>(
  * @param source Result of GraphQL execution.
  * @param selectionSet
  */
-function executeSelectionSet(
+function executeSelectionSet<TContext>(
   source: Record<string, any> | null,
   selections: QueryPlanSelectionNode[],
+  context: ExecutionContext<TContext>,
 ): Record<string, any> | null {
 
   // If the underlying service has returned null for the parent (source)
@@ -405,16 +406,19 @@ function executeSelectionSet(
         const selections = (selection as QueryPlanFieldNode).selections;
 
         if (typeof source[responseName] === 'undefined') {
-          throw new Error(`Field "${responseName}" was not found in response.`);
+          // collect error but continue to resolve
+          context.errors.push(new GraphQLError(`Field "${responseName}" was not found in response.`));
+          break;
         }
         if (Array.isArray(source[responseName])) {
           result[responseName] = source[responseName].map((value: any) =>
-            selections ? executeSelectionSet(value, selections) : value,
+            selections ? executeSelectionSet(value, selections, context) : value,
           );
         } else if (selections) {
           result[responseName] = executeSelectionSet(
             source[responseName],
             selections,
+            context
           );
         } else {
           result[responseName] = source[responseName];
@@ -429,7 +433,7 @@ function executeSelectionSet(
         if (typename === selection.typeCondition) {
           deepMerge(
             result,
-            executeSelectionSet(source, selection.selections),
+            executeSelectionSet(source, selection.selections, context),
           );
         }
         break;

@@ -828,4 +828,58 @@ describe('executeQueryPlan', () => {
       }
     `);
   });
+
+  it('can execute queries with selections on unresolved @requires fields', async () => {
+    // query a book not known to the book service
+    const operationString = `#graphql
+      query {
+        products(upcs: ["9999999999", "0987654321"]) {
+          upc
+          name
+          price
+        }
+      }
+    `;
+
+    const operationDocument = gql(operationString);
+
+    const operationContext = buildOperationContext({
+      schema,
+      operationDocument,
+      operationString,
+      queryPlannerPointer,
+    });
+
+    const queryPlan = buildQueryPlan(operationContext);
+
+    const response = await executeQueryPlan(
+      queryPlan,
+      serviceMap,
+      buildRequestContext(),
+      operationContext,
+    );
+
+    expect(response.errors?.map(e => e.message)).toEqual(expect.arrayContaining([
+      "Cannot return null for non-nullable field Book.isbn.",
+      "Field \"title\" was not found in response.",
+      "Field \"year\" was not found in response.",
+    ]));
+
+    expect(response.data).toMatchInlineSnapshot(`
+      Object {
+        "products": Array [
+          Object {
+            "name": "undefined (undefined)",
+            "price": "31",
+            "upc": "9999999999",
+          },
+          Object {
+            "name": "No Books Like This Book! (2019)",
+            "price": "29",
+            "upc": "0987654321",
+          },
+        ],
+      }
+    `);
+  });
 });

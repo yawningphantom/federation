@@ -30,6 +30,37 @@ it('does not have to go to another service when field is given', async () => {
   expect(queryPlan).toCallService('reviews');
 });
 
+it('does not have to go to another service when field is given for interface', async () => {
+  const query = `#graphql
+    query GetReviewers {
+      topReviews(first: 3) {
+        vehicle {
+          description
+        }
+      }
+    }
+  `;
+
+  const { data, errors, queryPlan } = await execute(
+    {
+      query,
+    },
+    fixtures,
+  );
+
+  expect(errors).toBeUndefined();
+  expect(data).toEqual({
+    topReviews: [
+      { vehicle: { description: 'Humble Toyota' } },
+      { vehicle: { description: 'Awesome Tesla' } },
+      { vehicle: null },
+    ],
+  });
+
+  expect(queryPlan).not.toCallService('product');
+  expect(queryPlan).toCallService('reviews');
+});
+
 it('does not load fields provided even when going to other service', async () => {
   const [accounts, ...restFixtures] = fixtures;
 

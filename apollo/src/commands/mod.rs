@@ -1,4 +1,5 @@
 use structopt::StructOpt;
+pub mod utils;
 
 /// Commands implement the Command trait, which lets us run() them
 /// and get Output.

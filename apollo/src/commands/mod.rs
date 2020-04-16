@@ -16,6 +16,8 @@ pub enum Apollo {
     Print(Print),
     ///  🔓  log in to apollo
     Login(Login),
+    /// Create an object
+    Create(Create)
 }
 //#endregion
 
@@ -35,6 +37,22 @@ pub struct Print {
 }
 //#endregion
 
+//#region    ... create
+pub mod create;
+
+#[derive(StructOpt)]
+#[structopt(rename_all = "kebab-case")]
+pub enum Create {
+    /// Create a graph with Apollo Graph Manager
+    /// This is interactive by default
+    Graph(CreateGraph)
+}
+
+#[derive(StructOpt)]
+#[structopt(rename_all = "kebab-case")]
+pub struct CreateGraph {}
+//#endregion
+
 //#region    ... login
 pub mod login;
 
@@ -47,7 +65,10 @@ impl Command for Apollo {
     fn run(&self) {
         match self {
             Apollo::Print(cmd) => cmd.run(),
-            Apollo::Login(cmd) => cmd.run(),    
+            Apollo::Login(cmd) => cmd.run(),
+            Apollo::Create(cmd) => match cmd {
+                Create::Graph(subcmd) => subcmd.run(),
+            }
         }
     }
 }

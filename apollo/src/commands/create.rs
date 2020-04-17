@@ -13,7 +13,7 @@ impl Command for CreateGraph {
             Ok(token) => token,
         };
         let gql_client = graphql::client::ApolloCloudClient::new(
-            String::from("https://engine-staging-graphql.apollographql.com"),
+            String::from("https://engine-staging-graphql.apollographql.com/api/graphql"),
             auth_token,
         );
 
@@ -24,7 +24,6 @@ impl Command for CreateGraph {
                 return;
             }
         };
-        let mut accounts_pretty = String::new();
         let accounts_pretty = format!("[ {} ]", accounts.clone().into_iter().collect::<Vec<String>>().join(", "));
         let account = if accounts.is_empty() {
             println!("You are not a member of any organization");

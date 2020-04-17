@@ -1,10 +1,11 @@
-use serde_json::{Value, Map};
+use serde_json::{Value, Map, Error};
 use reqwest::blocking::{Client, ClientBuilder};
 use serde::{Serialize, Deserialize};
 use std::collections::{HashMap, HashSet};
 use reqwest::header::{HeaderMap, HeaderValue};
 use std::vec::Vec;
 use std::iter::FromIterator;
+use serde::de::DeserializeOwned;
 
 pub struct ApolloCloudClient {
     endpoint_url: String,
@@ -18,28 +19,28 @@ struct Query {
 }
 
 #[derive(Deserialize)]
-struct GetOrgMembershipResponse__account {
+struct GetOrgMembershipResponseAccount {
     id: String
 }
 
 #[derive(Deserialize)]
-struct GetOrgMembershipResponse__membership {
-   account: GetOrgMembershipResponse__account
+struct GetOrgMembershipResponseMembership {
+   account: GetOrgMembershipResponseAccount
 }
 
 #[derive(Deserialize)]
-struct GetOrgMembershipRespose__memberships {
-  memberships: std::vec::Vec<GetOrgMembershipResponse__membership>
+struct GetOrgMembershipResposeMemberships {
+  memberships: std::vec::Vec<GetOrgMembershipResponseMembership>
 }
 
 #[derive(Deserialize)]
-struct GetOrgMembershipResponse__me {
-   me: Option<GetOrgMembershipRespose__memberships>
+struct GetOrgMembershipResponseMe {
+   me: Option<GetOrgMembershipResposeMemberships>
 }
 
 #[derive(Deserialize)]
 struct GetOrgMembershipResponse {
-    data: GetOrgMembershipResponse__me
+    data: GetOrgMembershipResponseMe
 }
 
 impl ApolloCloudClient {
@@ -52,27 +53,37 @@ impl ApolloCloudClient {
         }
     }
 
-    pub fn get_org_memberships(&self) -> Result<HashSet<String>, &str> {
-        let mut operation_map = HashMap::new();
-        operation_map.insert("query", GET_ORG_MEMBERSHIPS_QUERY);
+    fn execute_operation<T: DeserializeOwned>(&self, operation_string: &str, variables: Option<HashMap<String,String>>) -> Result<T, Error> {
+        let mut json_payload = HashMap::new();
+        json_payload.insert("query", operation_string);
         let mut headers = HeaderMap::new();
         headers.insert("X-API-KEY",
-                       HeaderValue::from_str(self.auth_token[..].as_ref()).unwrap());
-        let res = match self.client.post("https://engine-staging-graphql.apollographql.com/api/graphql")
+                       HeaderValue::from_str(&self.auth_token[..].as_ref()).unwrap());
+        let res = match self.client.post(&self.endpoint_url)
             .headers(headers)
-            .json::<HashMap<&str, &str>>(&operation_map).send() {
+            .json::<HashMap<&str, &str>>(&json_payload).send() {
             Ok(res) => res,
             Err(e) => panic!(e)
         };
-        let text = res.text().unwrap();
-        let results = match serde_json::from_str::<GetOrgMembershipResponse>(&text) {
+        let text = String::from(res.text().unwrap());
+        match serde_json::from_str::<T>(&text) {
+            Ok(r) => Ok(r),
+            Err(e) => {
+                panic!(format!("Invalid response from Apollo cloud!\n{}", e))
+            }
+        }
+    }
+
+    pub fn get_org_memberships(&self) -> Result<HashSet<String>, &str> {
+        let result = match self.execute_operation::<GetOrgMembershipResponse>(
+            GET_ORG_MEMBERSHIPS_QUERY, None) {
             Ok(r) => r,
             Err(e) => {
-                println!("Invalid response: {}", text);
-                panic!("Invalid response from Apollo cloud!")
-            }
+                println!("Encountered error {}", e);
+                return Err("Could not fetch organizations")
+            },
         };
-        match results.data.me {
+        match result.data.me {
             Some(me) =>
                 Ok(
                     HashSet::from_iter(
@@ -82,6 +93,10 @@ impl ApolloCloudClient {
             None => Err("Could not authenticate. Please check that your auth token is up-to-date"),
         }
 
+    }
+
+    pub fn create_new_graph(&self) -> Result<&str, &str> {
+        panic!("Not implemented!");
     }
 }
 
@@ -94,6 +109,17 @@ query GetOrgMemberships {
            id
          }
       }
+    }
+  }
+}
+";
+
+static CREATE_GRAPH_QUERY: &'static str = "
+mutation CreateGraph($accountID: ID!, $graphID: ID!) {
+  newService(accountId: $accountID, id: $graphID) {
+    id
+    apiKeys {
+      token
     }
   }
 }

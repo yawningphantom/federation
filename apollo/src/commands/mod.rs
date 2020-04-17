@@ -16,8 +16,8 @@ pub enum Apollo {
     ///  🖨   parse and pretty print schemas to stdout
     Print(Print),
     ///  🔓  log in to apollo
-    Login(Login),
-    /// Create an object
+    Auth(Auth),
+    ///  🆕  create an object
     Create(Create)
 }
 //#endregion
@@ -55,20 +55,37 @@ pub struct CreateGraph {}
 //#endregion
 
 //#region    ... login
-pub mod login;
+pub mod auth;
 
 #[derive(StructOpt)]
 #[structopt(rename_all = "kebab-case")]
-pub struct Login {}
+pub enum Auth {
+    /// login as a user with an interactive command
+    Login(AuthLogin),
+    /// configure authentication via pasting in an existing key
+    Configure(AuthConfigure)
+}
+
+#[derive(StructOpt)]
+#[structopt(rename_all = "kebab-case")]
+pub struct AuthLogin {}
+
+#[derive(StructOpt)]
+#[structopt(rename_all = "kebab-case")]
+pub struct AuthConfigure {}
+
 //#endregion
 
 impl Command for Apollo {
     fn run(&self) -> i32 {
         match self {
             Apollo::Print(cmd) => cmd.run(),
-            Apollo::Login(cmd) => cmd.run(),
             Apollo::Create(cmd) => match cmd {
-                Create::Graph(subcmd) => subcmd.run(),
+                Create::Graph(sub) => sub.run(),
+            },
+            Apollo::Auth(cmd) => match cmd {
+                Auth::Configure(sub) => sub.run(),
+                Auth::Login(sub) => sub.run(),
             }
         }
     }

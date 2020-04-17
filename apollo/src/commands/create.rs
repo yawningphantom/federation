@@ -33,9 +33,9 @@ impl Command for CreateGraph {
         } else if accounts.len() == 1 {
             String::from(accounts.iter().next().unwrap())
         } else {
-            let mut prompt_string = format!("Please choose an organization to own the graph from the following list\n{} ", accounts_pretty);
+            let mut prompt_string = format!("Please choose an organization to own the graph from the following list\n{}\n> ", accounts_pretty);
             loop {
-                let chosen_account = get_user_input(&prompt_string).unwrap();
+                let chosen_account = get_user_input(&prompt_string, false).unwrap();
                 if accounts.contains(&chosen_account) {
                     break chosen_account;
                 } else {
@@ -44,7 +44,7 @@ impl Command for CreateGraph {
             }
         };
 
-        let graph_id = get_user_input("Choose a name for your graph (cannot be changed) ").unwrap();
+        let graph_id = get_user_input("Choose a name for your graph (cannot be changed) \n> ", false).unwrap();
         let token = gql_client.create_new_graph(graph_id.clone(), account_id.clone());
         match token {
             Ok(t) => {

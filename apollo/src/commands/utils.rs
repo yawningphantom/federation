@@ -4,16 +4,20 @@ use regex::Regex;
 use dirs;
 use std::path::Path;
 use console::{Term, TermFeatures};
+use std::error::Error;
 
-pub fn get_user_input(prompt_string: &str) -> Result<String, std::io::Error> {
-    // If we are outputing to a terminal use the stdout for input
+pub fn get_user_input(prompt_string: &str, secure: bool) -> Result<String, std::io::Error> {
+    // If we are outputting to a terminal use the stdout for input
     let result = if atty::is(atty::Stream::Stdout) {
         let terminal = Term::stdout();
-        let mut text = terminal.read_line_initial_text(prompt_string)?;
-        // Write an empty line after hitting enter since terminal will swalloe that.
-        terminal.write_line("") ;
-        // This text comes with  the input text attached so we can just trim it off
-        text.split_off(prompt_string.len())
+        let text = if secure {
+            terminal.read_secure_line()?
+        } else {
+            terminal.read_line_initial_text(prompt_string)?.split_off(prompt_string.len())
+        };
+        // Write an empty line after hitting enter since terminal will swallow that.
+        terminal.write_line("");
+        text
     } else {
         println!("{}", prompt_string);
         let mut string_buffer = String::new();
@@ -25,7 +29,7 @@ pub fn get_user_input(prompt_string: &str) -> Result<String, std::io::Error> {
     return Ok(trimmed);
 }
 
-pub fn get_auth() -> Result<String,String> {
+pub fn get_auth() -> Result<String, String> {
     let mut file_path = dirs::home_dir().unwrap();
     file_path.push(".apollo/auth-token");
     let mut key_file = match File::open(file_path.as_path()) {
@@ -44,6 +48,14 @@ pub fn get_auth() -> Result<String,String> {
     }
 
     return Ok(trimmed);
+}
+
+pub fn write_auth_token(token: String) -> Result<(), Error> {
+    let mut path = dirs::home_dir().unwrap();
+    path.push(".apollo");
+    std::fs::create_dir_all(&path);
+    path.push("auth-token");
+    std::fs::write(path, token)
 }
 
 fn trim_whitespace(mut input: String) -> String {

@@ -1,7 +1,7 @@
 use crate::commands::{Command, CreateGraph};
 use crate::commands::utils;
-use crate::commands::utils::get_auth;
-use crate::graphql;
+use crate::commands::utils::{get_auth, get_user_input};
+use crate::graphql::ApolloCloudClient;
 
 impl Command for CreateGraph {
     fn run(&self) -> i32 {
@@ -12,18 +12,23 @@ impl Command for CreateGraph {
             }
             Ok(token) => token,
         };
-        let gql_client = graphql::ApolloCloudClient::new(
+
+        let gql_client = ApolloCloudClient::new(
             String::from("https://engine-staging-graphql.apollographql.com/api/graphql"),
             auth_token,
         );
 
+        get_user_input("testing this function").unwrap();
+        return 0;
+
         let accounts = match gql_client.get_org_memberships() {
             Ok(a) => a,
             Err(e) => {
-                println!("{}", e);
+                eprintln!("{}", e);
                 return 1;
             }
         };
+
         let accounts_pretty = format!("[ {} ]", accounts.clone().into_iter().collect::<Vec<String>>().join(", "));
         let account_id = if accounts.is_empty() {
             println!("You are not a member of any organization");

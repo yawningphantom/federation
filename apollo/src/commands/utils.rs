@@ -50,12 +50,15 @@ pub fn get_auth() -> Result<String, String> {
     return Ok(trimmed);
 }
 
-pub fn write_auth_token(token: String) -> Result<(), Error> {
+pub fn write_auth_token(token: String) -> Result<(), String> {
     let mut path = dirs::home_dir().unwrap();
     path.push(".apollo");
     std::fs::create_dir_all(&path);
     path.push("auth-token");
-    std::fs::write(path, token)
+    match std::fs::write(path, token) {
+        Ok(_) => Ok(()),
+        Err (_) => Err(String::from("failed to write token")),
+    }
 }
 
 fn trim_whitespace(mut input: String) -> String {

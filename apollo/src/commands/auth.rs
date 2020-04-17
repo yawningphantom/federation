@@ -24,8 +24,7 @@ impl Command for AuthConfigure {
         println!("{}", style("Please paste in your API token (visit https://engine-staging.apollographql.com/user-settings to obtain or create an API token)")
             .blue());
         let new_auth_token = get_user_input("ignored", true).unwrap();
-
-        println!("{}", new_auth_token.unwrap());
-        1
+        utils::write_auth_token(new_auth_token);
+        0
     }
 }

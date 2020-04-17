@@ -6,10 +6,10 @@ use reqwest::header::{HeaderMap, HeaderValue};
 use std::vec::Vec;
 use std::iter::FromIterator;
 use serde::de::DeserializeOwned;
+use dirs::data_dir;
 
 pub struct ApolloCloudClient {
     endpoint_url: String,
-    auth_token: String,
     client: Client,
 }
 
@@ -53,17 +53,17 @@ struct GetOrgMembershipResponseAccount {
 
 #[derive(Deserialize)]
 struct GetOrgMembershipResponseMembership {
-   account: GetOrgMembershipResponseAccount
+    account: GetOrgMembershipResponseAccount
 }
 
 #[derive(Deserialize)]
 struct GetOrgMembershipResposeMemberships {
-  memberships: std::vec::Vec<GetOrgMembershipResponseMembership>
+    memberships: std::vec::Vec<GetOrgMembershipResponseMembership>
 }
 
 #[derive(Deserialize)]
 struct GetOrgMembershipResponseMe {
-   me: Option<GetOrgMembershipResposeMemberships>
+    me: Option<GetOrgMembershipResposeMemberships>
 }
 
 #[derive(Deserialize)]
@@ -72,12 +72,23 @@ struct GetOrgMembershipResponse {
     errors: Option<Vec<GraphqlError>>,
 }
 
+pub struct GraphqlOperationError {
+    message: String,
+    user_error: bool,
+}
+
 impl ApolloCloudClient {
     pub fn new(endpoint_url: String, auth_token: String) -> ApolloCloudClient {
-        let client = Client::new();
+        let mut headers = HeaderMap::new();
+        headers.insert("X-API-KEY",
+                       HeaderValue::from_str(&auth_token[..].as_ref()).unwrap());
+
+        let client = ClientBuilder::new()
+            .default_headers(headers)
+            .build().unwrap();
+
         ApolloCloudClient {
             endpoint_url,
-            auth_token,
             client,
         }
     }
@@ -86,25 +97,19 @@ impl ApolloCloudClient {
         let mut json_payload: HashMap<&str, String> = HashMap::new();
         json_payload.insert("query", String::from(operation_string));
         let vars_string = serde_json::to_string(&variables).unwrap();
-        println!("{}", vars_string);
         json_payload.insert("variables", vars_string);
 
-        let mut headers = HeaderMap::new();
-        headers.insert("X-API-KEY",
-                       HeaderValue::from_str(&self.auth_token[..].as_ref()).unwrap());
         let res = match self.client.post(&self.endpoint_url)
-            .headers(headers)
             .json::<HashMap<&str, String>>(&json_payload).send() {
             Ok(res) => res,
             Err(e) => panic!(e)
         };
+
         let text = String::from(res.text().unwrap());
-        let textClone = text.clone();
         match serde_json::from_str::<T>(&text) {
             Ok(r) => Ok(r),
             Err(e) => {
-                println!("Sad error: {}", textClone);
-                panic!(format!("Invalid response from Apollo cloud!\n{}", e))
+                return Err(e);
             }
         }
     }
@@ -113,11 +118,7 @@ impl ApolloCloudClient {
         let mut json_payload: HashMap<&str, String> = HashMap::new();
         json_payload.insert("query", String::from(operation_string));
 
-        let mut headers = HeaderMap::new();
-        headers.insert("X-API-KEY",
-                       HeaderValue::from_str(&self.auth_token[..].as_ref()).unwrap());
         let res = match self.client.post(&self.endpoint_url)
-            .headers(headers)
             .json::<HashMap<&str, String>>(&json_payload).send() {
             Ok(res) => res,
             Err(e) => panic!(e)
@@ -137,8 +138,8 @@ impl ApolloCloudClient {
             Ok(r) => r,
             Err(e) => {
                 println!("Encountered error {}", e);
-                return Err("Could not fetch organizations")
-            },
+                return Err("Could not fetch organizations");
+            }
         };
         match result.data.unwrap().me {
             Some(me) =>
@@ -149,16 +150,34 @@ impl ApolloCloudClient {
                         ).collect::<Vec<String>>())),
             None => Err("Could not authenticate. Please check that your auth token is up-to-date"),
         }
-
     }
 
-    pub fn create_new_graph(&self, graph_id: String, account_id: String) -> Result<String, &str> {
+    pub fn create_new_graph(&self, graph_id: String, account_id: String) -> Result<String, GraphqlOperationError> {
         let variables = CreateGraphVariables {
             graphID: graph_id,
             accountID: account_id,
         };
-        let result = self.execute_operation::<CreateGraphResponse, CreateGraphVariables>(CREATE_GRAPH_QUERY, variables).unwrap();
-        return Ok(result.data.unwrap().newService.apiKeys[0].token.clone());
+        let result =
+            match self.execute_operation::<CreateGraphResponse, CreateGraphVariables>(CREATE_GRAPH_QUERY, variables) {
+                Ok(result) => result,
+                Err(message) => return Err(GraphqlOperationError { message: message.to_string(), user_error: false })
+            };
+        if result.errors.is_some() {
+            let message = result.errors.unwrap()
+                .iter_mut().map(| err| err.message.clone())
+                .collect::<Vec<String>>().join("\n");
+            return Err(GraphqlOperationError { message, user_error: false });
+        }
+
+        let data = match result.data {
+            Some(data) => data,
+            None => return Err(GraphqlOperationError {
+                message: String::from("Got no data????"),
+                user_error: false,
+            })
+        };
+
+        Ok(data.newService.apiKeys[0].token.clone())
     }
 }
 

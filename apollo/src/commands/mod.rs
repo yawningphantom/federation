@@ -5,7 +5,7 @@ pub mod utils;
 /// and get Output.
 pub trait Command {
     /// Execute the command. TODO: should this return a Result?
-    fn run(&self) {}
+    fn run(&self) -> i32 {0}
 }
 
 //#region    apollo <command>
@@ -63,7 +63,7 @@ pub struct Login {}
 //#endregion
 
 impl Command for Apollo {
-    fn run(&self) {
+    fn run(&self) -> i32 {
         match self {
             Apollo::Print(cmd) => cmd.run(),
             Apollo::Login(cmd) => cmd.run(),
@@ -76,6 +76,6 @@ impl Command for Apollo {
 
 impl Apollo {
     pub fn main() {
-        Apollo::from_args().run();
+        std::process::exit(Apollo::from_args().run());
     }
 }

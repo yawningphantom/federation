@@ -19,11 +19,19 @@ pub struct GraphqlOperationError {
     user_error: bool,
 }
 
+#[derive(Serialize)]
+struct GraphqlQuery<'a> {
+    query: &'a str,
+    variables: Option<&'a String>
+}
+
 impl ApolloCloudClient {
     pub fn new(endpoint_url: String, auth_token: String) -> ApolloCloudClient {
         let mut headers = HeaderMap::new();
         headers.insert("X-API-KEY",
-                       HeaderValue::from_str(&auth_token[..].as_ref()).unwrap());
+                       HeaderValue::from_str(&auth_token).unwrap());
+        headers.insert("CONTENT-TYPE",
+                       HeaderValue::from_str("application/json").unwrap());
 
         let client = ClientBuilder::new()
             .default_headers(headers)
@@ -35,14 +43,10 @@ impl ApolloCloudClient {
         }
     }
 
-    fn execute_operation<T: DeserializeOwned, V: Serialize>(&self, operation_string: &str, variables: V) -> Result<T, Error> {
-        let mut json_payload: HashMap<&str, String> = HashMap::new();
-        json_payload.insert("query", String::from(operation_string));
-        let vars_string = serde_json::to_string(&variables).unwrap();
-        json_payload.insert("variables", vars_string);
-
+    fn send_query<T: DeserializeOwned>(&self, query: GraphqlQuery) -> Result<T, Error> {
+        let query_body = serde_json::to_string(&query).unwrap();
         let res = match self.client.post(&self.endpoint_url)
-            .json::<HashMap<&str, String>>(&json_payload).send() {
+            .body(query_body).send() {
             Ok(res) => res,
             Err(e) => panic!(e)
         };
@@ -56,22 +60,15 @@ impl ApolloCloudClient {
         }
     }
 
-    fn execute_operation_no_variables<T: DeserializeOwned>(&self, operation_string: &str) -> Result<T, Error> {
-        let mut json_payload: HashMap<&str, String> = HashMap::new();
-        json_payload.insert("query", String::from(operation_string));
+    fn execute_operation<T: DeserializeOwned, V: Serialize>(&self, operation_string: &str, variables: V) -> Result<T, Error> {
+        let vars_string = serde_json::to_string(&variables).unwrap();
+        let gql_query = GraphqlQuery { query: operation_string, variables: Some(&vars_string)};
+        self.send_query::<T>(gql_query)
+    }
 
-        let res = match self.client.post(&self.endpoint_url)
-            .json::<HashMap<&str, String>>(&json_payload).send() {
-            Ok(res) => res,
-            Err(e) => panic!(e)
-        };
-        let text = String::from(res.text().unwrap());
-        match serde_json::from_str::<T>(&text) {
-            Ok(r) => Ok(r),
-            Err(e) => {
-                panic!(format!("Invalid response from Apollo cloud!\n{}", e))
-            }
-        }
+    fn execute_operation_no_variables<T: DeserializeOwned>(&self, operation_string: &str) -> Result<T, Error> {
+        let gql_query = GraphqlQuery { query: operation_string, variables: None};
+        self.send_query::<T>(gql_query)
     }
 
     pub fn get_org_memberships(&self) -> Result<HashSet<String>, &str> {

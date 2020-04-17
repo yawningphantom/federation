@@ -1,4 +1,4 @@
-use serde_json::{Result, Value, Map};
+use serde_json::{Value, Map};
 use reqwest::blocking::{Client, ClientBuilder};
 use serde::{Serialize, Deserialize};
 use std::collections::{HashMap, HashSet};
@@ -34,7 +34,7 @@ struct GetOrgMembershipRespose__memberships {
 
 #[derive(Deserialize)]
 struct GetOrgMembershipResponse__me {
-   me: GetOrgMembershipRespose__memberships
+   me: Option<GetOrgMembershipRespose__memberships>
 }
 
 #[derive(Deserialize)]
@@ -52,7 +52,7 @@ impl ApolloCloudClient {
         }
     }
 
-    pub fn get_org_memberships(&self) -> HashSet<String> {
+    pub fn get_org_memberships(&self) -> Result<HashSet<String>, &str> {
         let mut operation_map = HashMap::new();
         operation_map.insert("query", GET_ORG_MEMBERSHIPS_QUERY);
         let mut headers = HeaderMap::new();
@@ -65,8 +65,23 @@ impl ApolloCloudClient {
             Err(e) => panic!(e)
         };
         let text = res.text().unwrap();
-        let results = serde_json::from_str::<GetOrgMembershipResponse>(&text).unwrap();
-        HashSet::from_iter(results.data.me.memberships.into_iter().map(|it| it.account.id).collect::<Vec<String>>())
+        let results = match serde_json::from_str::<GetOrgMembershipResponse>(&text) {
+            Ok(r) => r,
+            Err(e) => {
+                println!("Invalid response: {}", text);
+                panic!("Invalid response from Apollo cloud!")
+            }
+        };
+        match results.data.me {
+            Some(me) =>
+                Ok(
+                    HashSet::from_iter(
+                        me.memberships.into_iter().map(
+                            |it| it.account.id
+                        ).collect::<Vec<String>>())),
+            None => Err("Could not authenticate. Please check that your auth token is up-to-date"),
+        }
+
     }
 }
 

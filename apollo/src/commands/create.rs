@@ -12,7 +12,7 @@ impl Command for CreateGraph {
             }
             Ok(token) => token,
         };
-        let gql_client = graphql::client::ApolloCloudClient::new(
+        let gql_client = graphql::ApolloCloudClient::new(
             String::from("https://engine-staging-graphql.apollographql.com/api/graphql"),
             auth_token,
         );

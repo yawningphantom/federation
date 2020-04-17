@@ -7,69 +7,11 @@ use std::vec::Vec;
 use std::iter::FromIterator;
 use serde::de::DeserializeOwned;
 use dirs::data_dir;
+use crate::graphql::types::*;
 
 pub struct ApolloCloudClient {
     endpoint_url: String,
     client: Client,
-}
-
-#[derive(Serialize)]
-struct CreateGraphVariables {
-    graphID: String,
-    accountID: String,
-}
-
-#[derive(Deserialize)]
-struct CreateGraphResponseApiKey {
-    token: String,
-}
-
-#[derive(Deserialize)]
-struct CreateGraphResponseNewService {
-    id: String,
-    apiKeys: Vec<CreateGraphResponseApiKey>,
-}
-
-#[derive(Deserialize)]
-struct CreateGraphResponseData {
-    newService: CreateGraphResponseNewService,
-}
-
-#[derive(Deserialize)]
-struct GraphqlError {
-    message: String,
-}
-
-#[derive(Deserialize)]
-struct CreateGraphResponse {
-    data: Option<CreateGraphResponseData>,
-    errors: Option<Vec<GraphqlError>>,
-}
-
-#[derive(Deserialize)]
-struct GetOrgMembershipResponseAccount {
-    id: String
-}
-
-#[derive(Deserialize)]
-struct GetOrgMembershipResponseMembership {
-    account: GetOrgMembershipResponseAccount
-}
-
-#[derive(Deserialize)]
-struct GetOrgMembershipResposeMemberships {
-    memberships: std::vec::Vec<GetOrgMembershipResponseMembership>
-}
-
-#[derive(Deserialize)]
-struct GetOrgMembershipResponseMe {
-    me: Option<GetOrgMembershipResposeMemberships>
-}
-
-#[derive(Deserialize)]
-struct GetOrgMembershipResponse {
-    data: Option<GetOrgMembershipResponseMe>,
-    errors: Option<Vec<GraphqlError>>,
 }
 
 pub struct GraphqlOperationError {

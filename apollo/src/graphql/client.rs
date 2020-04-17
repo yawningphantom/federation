@@ -14,8 +14,36 @@ pub struct ApolloCloudClient {
 }
 
 #[derive(Serialize)]
-struct Query {
-    query: String,
+struct CreateGraphVariables {
+    graphID: String,
+    accountID: String,
+}
+
+#[derive(Deserialize)]
+struct CreateGraphResponseApiKey {
+    token: String,
+}
+
+#[derive(Deserialize)]
+struct CreateGraphResponseNewService {
+    id: String,
+    apiKeys: Vec<CreateGraphResponseApiKey>,
+}
+
+#[derive(Deserialize)]
+struct CreateGraphResponseData {
+    newService: CreateGraphResponseNewService,
+}
+
+#[derive(Deserialize)]
+struct GraphqlError {
+    message: String,
+}
+
+#[derive(Deserialize)]
+struct CreateGraphResponse {
+    data: Option<CreateGraphResponseData>,
+    errors: Option<Vec<GraphqlError>>,
 }
 
 #[derive(Deserialize)]
@@ -40,7 +68,8 @@ struct GetOrgMembershipResponseMe {
 
 #[derive(Deserialize)]
 struct GetOrgMembershipResponse {
-    data: GetOrgMembershipResponseMe
+    data: Option<GetOrgMembershipResponseMe>,
+    errors: Option<Vec<GraphqlError>>,
 }
 
 impl ApolloCloudClient {
@@ -53,15 +82,43 @@ impl ApolloCloudClient {
         }
     }
 
-    fn execute_operation<T: DeserializeOwned>(&self, operation_string: &str, variables: Option<HashMap<String,String>>) -> Result<T, Error> {
-        let mut json_payload = HashMap::new();
-        json_payload.insert("query", operation_string);
+    fn execute_operation<T: DeserializeOwned, V: Serialize>(&self, operation_string: &str, variables: V) -> Result<T, Error> {
+        let mut json_payload: HashMap<&str, String> = HashMap::new();
+        json_payload.insert("query", String::from(operation_string));
+        let vars_string = serde_json::to_string(&variables).unwrap();
+        println!("{}", vars_string);
+        json_payload.insert("variables", vars_string);
+
         let mut headers = HeaderMap::new();
         headers.insert("X-API-KEY",
                        HeaderValue::from_str(&self.auth_token[..].as_ref()).unwrap());
         let res = match self.client.post(&self.endpoint_url)
             .headers(headers)
-            .json::<HashMap<&str, &str>>(&json_payload).send() {
+            .json::<HashMap<&str, String>>(&json_payload).send() {
+            Ok(res) => res,
+            Err(e) => panic!(e)
+        };
+        let text = String::from(res.text().unwrap());
+        let textClone = text.clone();
+        match serde_json::from_str::<T>(&text) {
+            Ok(r) => Ok(r),
+            Err(e) => {
+                println!("Sad error: {}", textClone);
+                panic!(format!("Invalid response from Apollo cloud!\n{}", e))
+            }
+        }
+    }
+
+    fn execute_operation_no_variables<T: DeserializeOwned>(&self, operation_string: &str) -> Result<T, Error> {
+        let mut json_payload: HashMap<&str, String> = HashMap::new();
+        json_payload.insert("query", String::from(operation_string));
+
+        let mut headers = HeaderMap::new();
+        headers.insert("X-API-KEY",
+                       HeaderValue::from_str(&self.auth_token[..].as_ref()).unwrap());
+        let res = match self.client.post(&self.endpoint_url)
+            .headers(headers)
+            .json::<HashMap<&str, String>>(&json_payload).send() {
             Ok(res) => res,
             Err(e) => panic!(e)
         };
@@ -75,15 +132,15 @@ impl ApolloCloudClient {
     }
 
     pub fn get_org_memberships(&self) -> Result<HashSet<String>, &str> {
-        let result = match self.execute_operation::<GetOrgMembershipResponse>(
-            GET_ORG_MEMBERSHIPS_QUERY, None) {
+        let result = match self.execute_operation_no_variables::<GetOrgMembershipResponse>(
+            GET_ORG_MEMBERSHIPS_QUERY) {
             Ok(r) => r,
             Err(e) => {
                 println!("Encountered error {}", e);
                 return Err("Could not fetch organizations")
             },
         };
-        match result.data.me {
+        match result.data.unwrap().me {
             Some(me) =>
                 Ok(
                     HashSet::from_iter(
@@ -95,8 +152,13 @@ impl ApolloCloudClient {
 
     }
 
-    pub fn create_new_graph(&self) -> Result<&str, &str> {
-        panic!("Not implemented!");
+    pub fn create_new_graph(&self, graph_id: String, account_id: String) -> Result<String, &str> {
+        let variables = CreateGraphVariables {
+            graphID: graph_id,
+            accountID: account_id,
+        };
+        let result = self.execute_operation::<CreateGraphResponse, CreateGraphVariables>(CREATE_GRAPH_QUERY, variables).unwrap();
+        return Ok(result.data.unwrap().newService.apiKeys[0].token.clone());
     }
 }
 

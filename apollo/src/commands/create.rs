@@ -25,7 +25,7 @@ impl Command for CreateGraph {
             }
         };
         let accounts_pretty = format!("[ {} ]", accounts.clone().into_iter().collect::<Vec<String>>().join(", "));
-        let account = if accounts.is_empty() {
+        let account_id = if accounts.is_empty() {
             println!("You are not a member of any organization");
             return;
         } else if accounts.len() == 1 {
@@ -43,6 +43,11 @@ impl Command for CreateGraph {
             }
         };
         let graph_id = utils::get_user_input("Choose a name for your graph (cannot be changed)").unwrap();
+        let token = gql_client.create_new_graph(graph_id.clone(), account_id.clone());
+        match token {
+            Ok(t) => println!("Congratulations on your new graph {0}!\nTo get started publishing your schema and metrics, add APOLLO_KEY={1} to your GraphQL server's environment variables.", graph_id, t),
+            Err(e) => println!("We couldn't create the graph! We'll need to do some kind of loop here on some conditions..."),
+        }
         println!("You have chosen {}. Excellent selection.", graph_id);
     }
 }

@@ -1,7 +1,7 @@
 use crate::commands::{Command, CreateGraph};
-use crate::commands::utils;
 use crate::commands::utils::{get_auth, get_user_input};
 use crate::graphql::ApolloCloudClient;
+use console::style;
 
 impl Command for CreateGraph {
     fn run(&self) -> i32 {
@@ -18,9 +18,6 @@ impl Command for CreateGraph {
             auth_token,
         );
 
-        get_user_input("testing this function").unwrap();
-        return 0;
-
         let accounts = match gql_client.get_org_memberships() {
             Ok(a) => a,
             Err(e) => {
@@ -36,22 +33,22 @@ impl Command for CreateGraph {
         } else if accounts.len() == 1 {
             String::from(accounts.iter().next().unwrap())
         } else {
-            let mut prompt_string = format!("Please choose an organization to own the graph from the following list\n{}", accounts_pretty);
+            let mut prompt_string = format!("Please choose an organization to own the graph from the following list\n{} ", accounts_pretty);
             loop {
-                let chosen_account = utils::get_user_input(&prompt_string).unwrap();
+                let chosen_account = get_user_input(&prompt_string).unwrap();
                 if accounts.contains(&chosen_account) {
                     break chosen_account;
                 } else {
-                    prompt_string = String::from("Invalid choice; please try again:");
+                    prompt_string = String::from("Invalid choice; please try again: ");
                 }
             }
         };
 
-        let graph_id = utils::get_user_input("Choose a name for your graph (cannot be changed)").unwrap();
+        let graph_id = get_user_input("Choose a name for your graph (cannot be changed) ").unwrap();
         let token = gql_client.create_new_graph(graph_id.clone(), account_id.clone());
         match token {
             Ok(t) => {
-                println!("Congratulations on your new graph {0}!\nTo get started publishing your schema and metrics, add APOLLO_KEY={1} to your GraphQL server's environment variables.", graph_id, t);
+                println!("Congratulations on your new graph {0}!\nTo get started publishing your schema and metrics, add APOLLO_KEY={1} to your GraphQL server's environment variables.", style(graph_id).green(), t);
                 0
             },
             Err(e) => {

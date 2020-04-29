@@ -31,8 +31,24 @@ impl<'a> Text<'a> for std::borrow::Cow<'a, str> {
 pub struct Directive<'a, T: Text<'a>> {
     pub position: Pos,
     pub name: T::Value,
+
+    /// Indicates whether that this is an ordering directive (experimental),
+    /// and if so, what the position of the field is.
+    ///
+    /// Ordeirng directives are experimental directives whose name is an
+    /// integer. They may have arguments. For example:
+    ///
+    ///   @0
+    ///   @19(packed: true)
+    ///
+    /// They're used to conveniently indicate field ordering within a
+    /// durable structure record.
+    pub field_order: FieldOrder,
     pub arguments: Vec<(T::Value, Value<'a, T>)>,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum FieldOrder { No, Order(i32), }
 
 /// This represents integer number
 ///
@@ -78,18 +94,40 @@ impl From<i32> for Number {
     }
 }
 
-pub fn directives<'a, T>(input: &mut TokenStream<'a>)
-    -> ParseResult<Vec<Directive<'a, T>>, TokenStream<'a>>
-    where T: Text<'a>, 
+pub fn directives<'a, S>(input: &mut TokenStream<'a>)
+    -> ParseResult<Vec<Directive<'a, S>>, TokenStream<'a>>
+    where S: Text<'a>, 
 {
-    many(position()
-        .skip(punct("@"))
-        .and(name::<'a, T>())
-        .and(parser(arguments))
-        .map(|((position, name), arguments)| {
-            Directive { position, name, arguments }
-        }))
-    .parse_stream(input)
+    many(
+        position()
+            .skip(punct("@"))
+            .and(parser(directive_identifier::<S>))
+            .and(parser(arguments))
+            .map(|((position, name), arguments)| {
+                Directive {
+                    position,
+                    name: S::Value::from(name.value),
+                    field_order:
+                        if name.kind == T::IntValue {
+                            if let Ok(order) = name.value.parse::<i32>() {
+                                FieldOrder::Order(order)
+                            } else {
+                                FieldOrder::No
+                            }
+                        } else {
+                            FieldOrder::No
+                        },
+                    arguments
+                }
+            })
+    ).parse_stream(input)
+}
+
+pub fn directive_identifier<'a, S>(input: &mut TokenStream<'a>)
+    -> ParseResult<Token<'a>, TokenStream<'a>>
+    where S: Text<'a>
+{
+    kind(T::IntValue).or(kind(T::Name)).parse_stream(input)
 }
 
 pub fn arguments<'a, T>(input: &mut TokenStream<'a>)
@@ -125,6 +163,7 @@ pub fn float_value<'a, S>(input: &mut TokenStream<'a>)
             .map(Value::Float)
     .parse_stream(input)
 }
+
 
 fn unquote_block_string<'a>(src: &'a str) -> Result<String, Error<Token<'a>, Token<'a>>> {
     debug_assert!(src.starts_with("\"\"\"") && src.ends_with("\"\"\""));

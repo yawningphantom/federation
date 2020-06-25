@@ -83,6 +83,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "apollo-graphql-parser-macros"
+version = "0.0.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "apollo-query-planner"
 version = "0.0.1"
 
@@ -1076,6 +1085,7 @@ dependencies = [
 name = "graphql-parser"
 version = "0.3.0"
 dependencies = [
+ "apollo-graphql-parser-macros",
  "bytecount",
  "combine",
  "insta",

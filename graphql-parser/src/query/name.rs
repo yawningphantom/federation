@@ -13,12 +13,6 @@ impl<'a> Name<'a> for Definition<'a> {
     }
 }
 
-impl<'a> Name<'a> for Field<'a> {
-    fn name(&self) -> Option<&'a str> {
-        Some(self.name)
-    }
-}
-
 impl<'a> Name<'a> for SelectionSet<'a> {}
 
 impl<'a> Name<'a> for Selection<'a> {

@@ -185,6 +185,9 @@
 #[macro_use]
 extern crate pretty_assertions;
 
+#[macro_use]
+extern crate apollo_graphql_parser_macros;
+
 mod common;
 #[macro_use]
 mod format;

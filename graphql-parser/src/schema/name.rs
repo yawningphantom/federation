@@ -42,20 +42,4 @@ impl<'a> Name<'a> for TypeExtension<'a> {
     }
 }
 
-impl<'a> Name<'a> for Field<'a> {
-    fn name(&self) -> Option<&'a str> {
-        Some(self.name)
-    }
-}
 
-impl<'a> Name<'a> for InputValue<'a> {
-    fn name(&self) -> Option<&'a str> {
-        Some(self.name)
-    }
-}
-
-impl<'a> Name<'a> for EnumValue<'a> {
-    fn name(&self) -> Option<&'a str> {
-        Some(self.name)
-    }
-}

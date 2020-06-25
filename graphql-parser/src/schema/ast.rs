@@ -4,6 +4,7 @@ use thiserror::Error;
 
 pub use crate::common::{Directive, Txt, Type, Value};
 use crate::position::Pos;
+use crate::Name;
 
 pub use crate::query::{FragmentDefinition, OperationDefinition};
 
@@ -131,7 +132,7 @@ impl<'a> ObjectTypeExtension<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Name)]
 pub struct Field<'a> {
     pub position: Pos,
     pub description: Option<String>,
@@ -141,7 +142,7 @@ pub struct Field<'a> {
     pub directives: Vec<Directive<'a>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Name)]
 pub struct InputValue<'a> {
     pub position: Pos,
     pub description: Option<String>,
@@ -254,7 +255,7 @@ impl<'a> EnumType<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Name)]
 pub struct EnumValue<'a> {
     pub position: Pos,
     pub description: Option<String>,

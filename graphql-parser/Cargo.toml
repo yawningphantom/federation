@@ -18,6 +18,7 @@ edition = "2018"
 combine = "3.8.1"
 thiserror = "1.0.20"
 bytecount = "0.6.0"
+apollo-graphql-parser-macros = { path = "../graphql-parser-macros" }
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"

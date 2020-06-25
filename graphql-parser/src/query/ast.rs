@@ -7,6 +7,7 @@
 //!
 pub use crate::common::{Directive, Txt, Type, Value};
 use crate::position::Pos;
+use crate::Name;
 
 /// Root of query data
 #[derive(Debug, Clone, PartialEq)]
@@ -81,7 +82,7 @@ pub enum Selection<'a> {
     InlineFragment(InlineFragment<'a>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Name)]
 pub struct Field<'a> {
     pub position: Pos,
     pub alias: Option<Txt<'a>>,

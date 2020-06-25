@@ -1,8 +1,6 @@
 use super::*;
 use crate::Name;
 
-impl<'a> Name<'a> for Document<'a> {}
-
 impl<'a> Name<'a> for Definition<'a> {
     fn name(&self) -> Option<&'a str> {
         match self {
@@ -13,8 +11,6 @@ impl<'a> Name<'a> for Definition<'a> {
     }
 }
 
-impl<'a> Name<'a> for SelectionSet<'a> {}
-
 impl<'a> Name<'a> for Selection<'a> {
     fn name(&self) -> Option<&'a str> {
         match self {
@@ -22,12 +18,6 @@ impl<'a> Name<'a> for Selection<'a> {
             Selection::FragmentSpread(spread) => spread.name(),
             Selection::InlineFragment(frag) => frag.name(),
         }
-    }
-}
-
-impl<'a> Name<'a> for FragmentSpread<'a> {
-    fn name(&self) -> Option<&'a str> {
-        Some(self.fragment_name)
     }
 }
 

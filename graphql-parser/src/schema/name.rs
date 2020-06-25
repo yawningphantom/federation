@@ -1,8 +1,6 @@
 use super::*;
 use crate::Name;
 
-impl<'a> Name<'a> for Document<'a> {}
-
 impl<'a> Name<'a> for Definition<'a> {
     fn name(&self) -> Option<&'a str> {
         match self {

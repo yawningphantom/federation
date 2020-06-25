@@ -8,6 +8,7 @@ use crate::Name;
 
 pub use crate::query::{FragmentDefinition, OperationDefinition};
 
+#[derive_name()]
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Document<'a> {
     pub definitions: Vec<Definition<'a>>,
@@ -132,7 +133,8 @@ impl<'a> ObjectTypeExtension<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Name)]
+#[derive_name(.name)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Field<'a> {
     pub position: Pos,
     pub description: Option<String>,
@@ -142,7 +144,8 @@ pub struct Field<'a> {
     pub directives: Vec<Directive<'a>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Name)]
+#[derive_name(.name)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct InputValue<'a> {
     pub position: Pos,
     pub description: Option<String>,
@@ -255,7 +258,8 @@ impl<'a> EnumType<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Name)]
+#[derive_name(.name)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EnumValue<'a> {
     pub position: Pos,
     pub description: Option<String>,

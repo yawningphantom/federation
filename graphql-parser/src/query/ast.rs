@@ -10,6 +10,7 @@ use crate::position::Pos;
 use crate::Name;
 
 /// Root of query data
+#[derive_name()]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Document<'a> {
     pub definitions: Vec<Definition<'a>>,
@@ -61,6 +62,7 @@ impl Operation {
     }
 }
 
+#[derive_name()]
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectionSet<'a> {
     pub span: (Pos, Pos),
@@ -82,7 +84,8 @@ pub enum Selection<'a> {
     InlineFragment(InlineFragment<'a>),
 }
 
-#[derive(Debug, Clone, PartialEq, Name)]
+#[derive_name(.name)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Field<'a> {
     pub position: Pos,
     pub alias: Option<Txt<'a>>,
@@ -92,6 +95,7 @@ pub struct Field<'a> {
     pub selection_set: SelectionSet<'a>,
 }
 
+#[derive_name(.fragment_name)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct FragmentSpread<'a> {
     pub position: Pos,

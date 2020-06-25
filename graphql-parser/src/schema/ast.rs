@@ -33,6 +33,7 @@ pub struct SchemaDefinition<'a> {
     pub subscription: Option<Txt<'a>>,
 }
 
+#[derive_name(enum)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeDefinition<'a> {
     Scalar(ScalarType<'a>),
@@ -43,6 +44,7 @@ pub enum TypeDefinition<'a> {
     InputObject(InputObjectType<'a>),
 }
 
+#[derive_name(enum)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeExtension<'a> {
     Scalar(ScalarTypeExtension<'a>),

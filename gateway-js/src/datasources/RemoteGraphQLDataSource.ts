@@ -107,7 +107,7 @@ export class RemoteGraphQLDataSource<TContext extends Record<string, any> = Reco
       // assume this is the best result we'll get and return it!
       if (
         !apqOptimisticResponse.errors ||
-        !apqOptimisticResponse.errors.find(error =>
+        !apqOptimisticResponse.errors.find((error: any) =>
           error.message === 'PersistedQueryNotFound')
       ) {
         return respond(apqOptimisticResponse, requestWithoutQuery);
@@ -166,7 +166,7 @@ export class RemoteGraphQLDataSource<TContext extends Record<string, any> = Reco
         http: fetchResponse,
       };
     } catch (error) {
-      this.didEncounterError(error, fetchRequest, fetchResponse);
+      this.didEncounterError?.({ error, request: fetchRequest, response: fetchResponse, context });
       throw error;
     }
   }
@@ -185,13 +185,14 @@ export class RemoteGraphQLDataSource<TContext extends Record<string, any> = Reco
     >,
   ): ValueOrPromise<GraphQLResponse>;
 
-  public didEncounterError(
-    error: Error,
-    _fetchRequest: Request,
-    _fetchResponse?: Response
-  ) {
-    throw error;
-  }
+  public didEncounterError?(
+    requestContextWithError: {
+      error: Error,
+      response?: Response,
+      context: TContext,
+      request: Request,
+    }
+  ): ValueOrPromise<void>;
 
   public parseBody(
     fetchResponse: Response,

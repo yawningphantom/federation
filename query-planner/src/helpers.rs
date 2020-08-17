@@ -27,7 +27,7 @@ pub fn get_operations<'q>(query: &'q Document<'q>) -> Vec<Op<'q>> {
 
 // compiles but results in inconsistent ordering in the return values' map value's vectors.
 pub fn build_possible_types<'a, 'q>(
-    types: &'a HashMap<&'q str, &'q schema::TypeDefinition<'q>>,
+    types: &'a LinkedHashMap<&'q str, &'q schema::TypeDefinition<'q>>,
 ) -> HashMap<&'q str, Vec<&'q schema::ObjectType<'q>>> {
     let mut implementing_types: HashMap<&'q str, Vec<&'q schema::ObjectType<'q>>> = HashMap::new();
     // NB: This will loop infinitely if the schema has implementation loops (A: B, B: A)
@@ -78,7 +78,7 @@ pub fn build_possible_types<'a, 'q>(
 
 pub fn names_to_types<'q>(
     schema: &'q schema::Document<'q>,
-) -> HashMap<&'q str, &'q TypeDefinition<'q>> {
+) -> LinkedHashMap<&'q str, &'q TypeDefinition<'q>> {
     schema
         .definitions
         .iter()

@@ -17,7 +17,7 @@ pub struct QueryPlanningContext<'q> {
     pub operation: Op<'q>,
     pub fragments: HashMap<&'q str, &'q FragmentDefinition<'q>>,
     pub possible_types: HashMap<&'q str, Vec<&'q schema::ObjectType<'q>>>,
-    pub names_to_types: HashMap<&'q str, &'q TypeDefinition<'q>>,
+    pub names_to_types: LinkedHashMap<&'q str, &'q TypeDefinition<'q>>,
     pub variable_name_to_def: HashMap<&'q str, &'q VariableDefinition<'q>>,
     pub federation: Federation<'q>,
     pub auto_fragmentization: bool,

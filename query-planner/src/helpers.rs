@@ -25,6 +25,7 @@ pub fn get_operations<'q>(query: &'q Document<'q>) -> Vec<Op<'q>> {
         .collect()
 }
 
+// compiles but results in inconsistent ordering in the return values' map value's vectors.
 pub fn build_possible_types<'a, 'q>(
     types: &'a HashMap<&'q str, &'q schema::TypeDefinition<'q>>,
 ) -> HashMap<&'q str, Vec<&'q schema::ObjectType<'q>>> {

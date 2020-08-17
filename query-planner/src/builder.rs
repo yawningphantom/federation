@@ -472,10 +472,10 @@ fn split_sub_fields<'q>(
     grouper.into_groups().pop().unwrap()
 }
 
-fn execution_node_for_group(
-    context: &QueryPlanningContext,
-    group: FetchGroup,
-    parent_type: Option<&TypeDefinition>,
+fn execution_node_for_group<'q>(
+    context: &'q QueryPlanningContext<'q>,
+    group: FetchGroup<'q>,
+    parent_type: Option<&'q TypeDefinition<'q>>,
 ) -> PlanNode {
     let FetchGroup {
         service_name,

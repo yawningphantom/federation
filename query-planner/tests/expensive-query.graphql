@@ -1,0 +1,14 @@
+query Search($query: String!) {
+  search(query: $query) {
+    itemStacks {
+      items {
+        name
+      }
+    }
+    contentLayout {
+      modules {
+        id
+      }
+    }
+  }
+}

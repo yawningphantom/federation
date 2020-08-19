@@ -1,0 +1,61 @@
+{
+  "kind": "QueryPlan",
+  "node": {
+    "kind": "Sequence",
+    "nodes": [
+      {
+        "kind": "Fetch",
+        "serviceName": "search",
+        "variableUsages": ["query"],
+        "operation": "query($query:String!){search(query:$query){__typename id resultKey}}"
+      },
+      {
+        "kind": "Parallel",
+        "nodes": [
+          {
+            "kind": "Flatten",
+            "path": ["search"],
+            "node": {
+              "kind": "Fetch",
+              "serviceName": "fetch",
+              "requires": [
+                {
+                  "kind": "InlineFragment",
+                  "typeCondition": "SearchResults",
+                  "selections": [
+                    { "kind": "Field", "name": "__typename" },
+                    { "kind": "Field", "name": "id" },
+                    { "kind": "Field", "name": "resultKey" }
+                  ]
+                }
+              ],
+              "variableUsages": [],
+              "operation": "query($representations:[_Any!]!){_entities(representations:$representations){...on SearchResults{itemStacks{items{name}}}}}"
+            }
+          },
+          {
+            "kind": "Flatten",
+            "path": ["search"],
+            "node": {
+              "kind": "Fetch",
+              "serviceName": "content-layout",
+              "requires": [
+                {
+                  "kind": "InlineFragment",
+                  "typeCondition": "SearchResults",
+                  "selections": [
+                    { "kind": "Field", "name": "__typename" },
+                    { "kind": "Field", "name": "id" },
+                    { "kind": "Field", "name": "resultKey" }
+                  ]
+                }
+              ],
+              "variableUsages": [],
+              "operation": "query($representations:[_Any!]!){_entities(representations:$representations){...on SearchResults{contentLayout{modules{id}}}}}"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

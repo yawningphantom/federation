@@ -1,0 +1,49 @@
+schema
+  @graph(name: "search", url: "https://search.api.com")
+  @graph(name: "content-layout", url: "https://content-layout.api.com")
+  @composedGraph(version: 1) {
+  query: Query
+}
+
+type Query {
+  search(query: String!): SearchResults @resolve(graph: "search")
+}
+
+type SearchResults
+  @owner(graph: "search")
+  @key(fields: "{ id }", graph: "search")
+  @key(fields: "{ id }", graph: "content-layout") {
+  id: String!
+  resultKey: String!
+  itemStacks: [ItemStack]! @expensive
+  contentLayout: ContentLayout
+    @resolve(graph: "content-layout")
+    @requires(fields: "{ resultKey }")
+}
+
+type ContentLayout {
+  modules: [Module]
+}
+
+type Item {
+  name: String!
+}
+
+type ItemStack {
+  id: String!
+  items: [Item]!
+}
+
+type Module {
+  id: String!
+}
+
+directive @composedGraph(version: Int!) on SCHEMA
+directive @graph(name: String!, url: String!) on SCHEMA
+directive @owner(graph: String!) on OBJECT
+directive @key(fields: String!, graph: String!) on OBJECT
+directive @resolve(graph: String!) on FIELD_DEFINITION
+directive @provides(fields: String!) on FIELD_DEFINITION
+directive @requires(fields: String!) on FIELD_DEFINITION
+directive @stream on FIELD
+directive @transform(from: String!) on FIELD

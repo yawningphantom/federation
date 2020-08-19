@@ -40,3 +40,19 @@ impl<'s> QueryPlanner<'s> {
         build_query_plan(&self.schema, &query)
     }
 }
+
+#[test]
+fn expensive_plan() {
+    static EXP_SCHEMA: &str = include_str!("../tests/expensive-csdl.graphql");
+    let query = include_str!("../tests/expensive-query.graphql");
+
+    let query = parse_query(query).unwrap();
+    let schema = parse_schema(EXP_SCHEMA).unwrap();
+
+    let result = build_query_plan(&schema, &query).unwrap();
+    let expected: QueryPlan =
+        serde_json::from_str(include_str!("../tests/expensive.json")).unwrap();
+
+    println!("PLAN: {:?}", serde_json::to_string(&result).unwrap());
+    assert_eq!(result, expected);
+}

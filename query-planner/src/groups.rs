@@ -209,8 +209,16 @@ impl<'q> GroupForField<'q> for GroupForSubField<'q> {
             )
         };
 
-        // Is the field defined on the base service?
-        if owning_service == base_service {
+        let is_expensive_field = &field_def
+            .directives
+            .iter()
+            .any(|directive| directive.name == "expensive");
+
+        // Is the field defined on the base service? Is the field expensive?
+        //  If there is an expensive directive, we need to return a new
+        //  group (or group of siblings) for the field, rather than the parent
+        //  group
+        if owning_service == base_service && !is_expensive_field {
             // Can we fetch the field from the parent group?
             if owning_service == self.parent_group.service_name
                 || self
@@ -243,8 +251,15 @@ impl<'q> GroupForField<'q> for GroupForSubField<'q> {
                 self.parent_group
                     .dependent_group_for_service(owning_service, key_fields)
             }
+        } else if *is_expensive_field {
+            let required_fields =
+                self.context
+                    .get_required_fields(parent_type, field_def, &owning_service);
+
+            println!("requires: {:?}", required_fields);
+            &mut self.parent_group
         } else {
-            // It's an extension field, so we need to fetch the required fields first.
+            // It's an extension (or expensive) field, so we need to fetch the required fields first.
             let required_fields =
                 self.context
                     .get_required_fields(parent_type, field_def, &owning_service);

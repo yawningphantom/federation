@@ -4,6 +4,7 @@ extern crate lazy_static;
 pub use crate::builder::build_query_plan;
 use crate::model::QueryPlan;
 use graphql_parser::{parse_query, parse_schema, schema, ParseError};
+use serde::Serialize;
 
 #[macro_use]
 mod macros;
@@ -25,6 +26,7 @@ pub enum QueryPlanError {
 
 pub type Result<T> = std::result::Result<T, QueryPlanError>;
 
+#[derive(Serialize)]
 pub struct QueryPlanner<'s> {
     schema: schema::Document<'s>,
 }

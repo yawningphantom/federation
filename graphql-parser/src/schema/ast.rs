@@ -4,15 +4,16 @@ use thiserror::Error;
 
 pub use crate::common::{Directive, Txt, Type, Value};
 use crate::position::Pos;
+use serde::Serialize;
 
 pub use crate::query::{FragmentDefinition, OperationDefinition};
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct Document<'a> {
     pub definitions: Vec<Definition<'a>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Definition<'a> {
     Schema(SchemaDefinition<'a>),
     Type(TypeDefinition<'a>),
@@ -22,7 +23,7 @@ pub enum Definition<'a> {
     Fragment(FragmentDefinition<'a>),
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct SchemaDefinition<'a> {
     pub position: Pos,
     pub directives: Vec<Directive<'a>>,
@@ -31,7 +32,7 @@ pub struct SchemaDefinition<'a> {
     pub subscription: Option<Txt<'a>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum TypeDefinition<'a> {
     Scalar(ScalarType<'a>),
     Object(ObjectType<'a>),
@@ -51,7 +52,7 @@ impl<'a> TypeDefinition<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum TypeExtension<'a> {
     Scalar(ScalarTypeExtension<'a>),
     Object(ObjectTypeExtension<'a>),
@@ -61,7 +62,7 @@ pub enum TypeExtension<'a> {
     InputObject(InputObjectTypeExtension<'a>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ScalarType<'a> {
     pub position: Pos,
     pub description: Option<String>,
@@ -80,7 +81,7 @@ impl<'a> ScalarType<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ScalarTypeExtension<'a> {
     pub position: Pos,
     pub name: Txt<'a>,
@@ -97,7 +98,7 @@ impl<'a> ScalarTypeExtension<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ObjectType<'a> {
     pub position: Pos,
     pub description: Option<String>,
@@ -120,7 +121,7 @@ impl<'a> ObjectType<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ObjectTypeExtension<'a> {
     pub position: Pos,
     pub name: Txt<'a>,
@@ -141,7 +142,7 @@ impl<'a> ObjectTypeExtension<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Field<'a> {
     pub position: Pos,
     pub description: Option<String>,
@@ -151,7 +152,7 @@ pub struct Field<'a> {
     pub directives: Vec<Directive<'a>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct InputValue<'a> {
     pub position: Pos,
     pub description: Option<String>,
@@ -161,7 +162,7 @@ pub struct InputValue<'a> {
     pub directives: Vec<Directive<'a>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct InterfaceType<'a> {
     pub position: Pos,
     pub description: Option<String>,
@@ -184,7 +185,7 @@ impl<'a> InterfaceType<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct InterfaceTypeExtension<'a> {
     pub position: Pos,
     pub name: Txt<'a>,
@@ -203,7 +204,7 @@ impl<'a> InterfaceTypeExtension<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct UnionType<'a> {
     pub position: Pos,
     pub description: Option<String>,
@@ -224,7 +225,7 @@ impl<'a> UnionType<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct UnionTypeExtension<'a> {
     pub position: Pos,
     pub name: Txt<'a>,
@@ -243,7 +244,7 @@ impl<'a> UnionTypeExtension<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct EnumType<'a> {
     pub position: Pos,
     pub description: Option<String>,
@@ -264,7 +265,7 @@ impl<'a> EnumType<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct EnumValue<'a> {
     pub position: Pos,
     pub description: Option<String>,
@@ -283,7 +284,7 @@ impl<'a> EnumValue<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct EnumTypeExtension<'a> {
     pub position: Pos,
     pub name: Txt<'a>,
@@ -302,7 +303,7 @@ impl<'a> EnumTypeExtension<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct InputObjectType<'a> {
     pub position: Pos,
     pub description: Option<String>,
@@ -323,7 +324,7 @@ impl<'a> InputObjectType<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct InputObjectTypeExtension<'a> {
     pub position: Pos,
     pub name: Txt<'a>,
@@ -342,7 +343,7 @@ impl<'a> InputObjectTypeExtension<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub enum DirectiveLocation {
     // executable
     Query,
@@ -367,7 +368,7 @@ pub enum DirectiveLocation {
     InputFieldDefinition,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct DirectiveDefinition<'a> {
     pub position: Pos,
     pub description: Option<String>,

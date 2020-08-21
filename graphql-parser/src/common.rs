@@ -6,12 +6,13 @@ use combine::parser::choice::{choice, optional};
 use combine::parser::item::position;
 use combine::parser::repeat::{many, many1};
 use combine::{parser, ParseResult, Parser};
+use serde::Serialize;
 
 use crate::helpers::{ident, kind, name, punct};
 use crate::position::Pos;
 use crate::tokenizer::{Kind as T, Token, TokenStream};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Directive<'a> {
     pub position: Pos,
     pub name: &'a str,
@@ -20,7 +21,7 @@ pub struct Directive<'a> {
 
 pub type Txt<'a> = &'a str;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Value<'a> {
     Variable(Txt<'a>),
     Int(i64),
@@ -33,7 +34,7 @@ pub enum Value<'a> {
     Object(BTreeMap<Txt<'a>, Value<'a>>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Type<'a> {
     NamedType(Txt<'a>),
     ListType(Box<Type<'a>>),

@@ -1,156 +1,26 @@
 extern crate wasm_bindgen;
 
-// use apollo_query_planner::model::*;
 use apollo_query_planner::QueryPlanner;
 use wasm_bindgen::prelude::*;
 
-// #[wasm_bindgen(js_name = getQueryPlan)]
-// pub fn get_query_plan() -> JsValue {
-//     JsValue::from_serde(&query_plan()).unwrap()
-// }
-
-#[wasm_bindgen(js_name = getQueryPlanner)]
-pub fn get_query_planner(schema: &str) -> JsValue {
+#[wasm_bindgen(js_name = getQueryPlan)]
+pub fn get_query_plan(schema: &str, query: &str) -> JsValue {
     let query_planner = QueryPlanner::new(schema);
-    JsValue::from_serde(&query_planner).unwrap()
+    JsValue::from_serde(&query_planner.plan(query).unwrap()).unwrap()
 }
 
-// fn query_plan() -> QueryPlan {
-//     QueryPlan {
-//         node: Some(PlanNode::Sequence {
-//             nodes: vec![
-//                 PlanNode::Fetch(FetchNode {
-//                     service_name: "product".to_owned(),
-//                     variable_usages: vec![],
-//                     requires: None,
-//                     operation: "{topProducts{__typename ...on Book{__typename isbn}...on Furniture{name}}product(upc:\"1\"){__typename ...on Book{__typename isbn}...on Furniture{name}}}".to_owned(),
-//                 }),
-//                 PlanNode::Parallel {
-//                     nodes: vec![
-//                         PlanNode::Sequence {
-//                             nodes: vec![
-//                                 PlanNode::Flatten(FlattenNode {
-//                                     path: vec![
-//                                         ResponsePathElement::Field("topProducts".to_owned()), ResponsePathElement::Field("@".to_owned())],
-//                                     node: Box::new(PlanNode::Fetch(FetchNode {
-//                                         service_name: "books".to_owned(),
-//                                         variable_usages: vec![],
-//                                         requires: Some(vec![
-//                                             Selection::InlineFragment(InlineFragment {
-//                                                 type_condition: Some("Book".to_owned()),
-//                                                 selections: vec![
-//                                                     Selection::Field(Field {
-//                                                         alias: None,
-//                                                         name: "__typename".to_owned(),
-//                                                         selections: None,
-//                                                     }),
-//                                                     Selection::Field(Field {
-//                                                         alias: None,
-//                                                         name: "isbn".to_owned(),
-//                                                         selections: None,
-//                                                     })],
-//                                             })]),
-//                                         operation: "query($representations:[_Any!]!){_entities(representations:$representations){...on Book{__typename isbn title year}}}".to_owned(),
-//                                     })),
-//                                 }),
-//                                 PlanNode::Flatten(FlattenNode {
-//                                     path: vec![
-//                                         ResponsePathElement::Field("topProducts".to_owned()),
-//                                         ResponsePathElement::Field("@".to_owned())],
-//                                     node: Box::new(PlanNode::Fetch(FetchNode {
-//                                         service_name: "product".to_owned(),
-//                                         variable_usages: vec![],
-//                                         requires: Some(vec![
-//                                             Selection::InlineFragment(InlineFragment {
-//                                                 type_condition: Some("Book".to_owned()),
-//                                                 selections: vec![
-//                                                     Selection::Field(Field {
-//                                                         alias: None,
-//                                                         name: "__typename".to_owned(),
-//                                                         selections: None,
-//                                                     }),
-//                                                     Selection::Field(Field {
-//                                                         alias: None,
-//                                                         name: "isbn".to_owned(),
-//                                                         selections: None,
-//                                                     }),
-//                                                     Selection::Field(Field {
-//                                                         alias: None,
-//                                                         name: "title".to_owned(),
-//                                                         selections: None,
-//                                                     }),
-//                                                     Selection::Field(Field {
-//                                                         alias: None,
-//                                                         name: "year".to_owned(),
-//                                                         selections: None,
-//                                                     })],
-//                                             })]),
-//                                         operation: "query($representations:[_Any!]!){_entities(representations:$representations){...on Book{name}}}".to_owned(),
-//                                     })),
-//                                 })]
-//                         },
-//                         PlanNode::Sequence {
-//                             nodes: vec![
-//                                 PlanNode::Flatten(FlattenNode {
-//                                     path: vec![
-//                                         ResponsePathElement::Field("product".to_owned())],
-//                                     node: Box::new(PlanNode::Fetch(FetchNode {
-//                                         service_name: "books".to_owned(),
-//                                         variable_usages: vec![],
-//                                         requires: Some(vec![
-//                                             Selection::InlineFragment(InlineFragment {
-//                                                 type_condition: Some("Book".to_owned()),
-//                                                 selections: vec![
-//                                                     Selection::Field(Field {
-//                                                         alias: None,
-//                                                         name: "__typename".to_owned(),
-//                                                         selections: None,
-//                                                     }),
-//                                                     Selection::Field(Field {
-//                                                         alias: None,
-//                                                         name: "isbn".to_owned(),
-//                                                         selections: None,
-//                                                     })],
-//                                             })]),
-//                                         operation: "query($representations:[_Any!]!){_entities(representations:$representations){...on Book{__typename isbn title year}}}".to_owned(),
-//                                     })),
-//                                 }),
-//                                 PlanNode::Flatten(FlattenNode {
-//                                     path: vec![
-//                                         ResponsePathElement::Field("product".to_owned())],
-//                                     node: Box::new(PlanNode::Fetch(FetchNode {
-//                                         service_name: "product".to_owned(),
-//                                         variable_usages: vec![],
-//                                         requires: Some(vec![
-//                                             Selection::InlineFragment(InlineFragment {
-//                                                 type_condition: Some("Book".to_owned()),
-//                                                 selections: vec![
-//                                                     Selection::Field(Field {
-//                                                         alias: None,
-//                                                         name: "__typename".to_owned(),
-//                                                         selections: None,
-//                                                     }),
-//                                                     Selection::Field(Field {
-//                                                         alias: None,
-//                                                         name: "isbn".to_owned(),
-//                                                         selections: None,
-//                                                     }),
-//                                                     Selection::Field(Field {
-//                                                         alias: None,
-//                                                         name: "title".to_owned(),
-//                                                         selections: None,
-//                                                     }),
-//                                                     Selection::Field(Field {
-//                                                         alias: None,
-//                                                         name: "year".to_owned(),
-//                                                         selections: None,
-//                                                     })],
-//                                             })]),
-//                                         operation: "query($representations:[_Any!]!){_entities(representations:$representations){...on Book{name}}}".to_owned(),
-//                                     })),
-//                                 })]
-//                         }]
-//                 }]
-//         })
-//     }
+// This is what we really want, however we can't use wasm-bindgen
+// with things that have lifetimes.
+// Adding a #[wasm-bindgen] to the QueryPlanner struct and
+// impl yields a compile error that says exactly that.
+// This restriction is arguably not that important when caching
+// comes into play, as we'll only be building a query plan once
+// in rust. This means it's not so important that the QueryPlanner
+// instance is handed over to JS - instead we can just return the
+// serialized query plan as we do up above.
+
+// #[wasm_bindgen(js_name = getQueryPlanner)]
+// pub fn get_query_planner(schema: &str) -> JsValue {
+//     let query_planner = QueryPlanner::new(schema);
+//     JsValue::from_serde(&query_planner).unwrap()
 // }

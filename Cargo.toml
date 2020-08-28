@@ -3,5 +3,5 @@ members = [
   "cli",
   "graphql-parser",
   "query-planner",
-  "wasm-bridge"
+  "wasm-query-planner"
 ]

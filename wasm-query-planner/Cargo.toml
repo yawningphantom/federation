@@ -1,5 +1,5 @@
 [package]
-name = "apollo-wasm-bridge"
+name = "query-planner"
 version = "0.0.1" # keep in sync with package.json
 authors = ["Apollo <opensource@apollographql.com>"]
 homepage = "https://github.com/apollographql/rust"

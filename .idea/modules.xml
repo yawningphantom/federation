@@ -6,7 +6,7 @@
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/cli.iml" filepath="$PROJECT_DIR$/.idea/modules/cli.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/graphql-parser.iml" filepath="$PROJECT_DIR$/.idea/modules/graphql-parser.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/query-planner.iml" filepath="$PROJECT_DIR$/.idea/modules/query-planner.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/wasm-bridge.iml" filepath="$PROJECT_DIR$/.idea/modules/wasm-bridge.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/wasm-query-planner.iml" filepath="$PROJECT_DIR$/.idea/modules/wasm-query-planner.iml" />
     </modules>
   </component>
 </project>

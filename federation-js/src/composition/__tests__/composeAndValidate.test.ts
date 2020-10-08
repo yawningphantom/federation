@@ -12,6 +12,7 @@ import {
   typeSerializer,
   graphqlErrorSerializer,
 } from '../../snapshotSerializers';
+import { getFederationMetadata } from '@apollo/federation/src/composition/utils';
 
 expect.addSnapshotSerializer(astSerializer);
 expect.addSnapshotSerializer(typeSerializer);
@@ -117,6 +118,57 @@ it('composes and validates all (24) permutations without error', () => {
     expect(errors).toHaveLength(0);
   });
 });
+
+it('composes without errors using nested @provides', () => {
+  const serviceA = {
+    typeDefs: gql`
+      type Query {
+        product: Product!
+      }
+
+      type Review {
+        product: Product @provides(fields: "sku { id }")
+      }
+
+      extend type Product {
+        sku: Sku! @external
+        color: String
+      }
+
+      extend type Sku {
+        id: ID! @external
+      }
+    `,
+    name: 'serviceA',
+  };
+
+  const serviceB = {
+    typeDefs: gql`
+      type Product @key(fields: "sku { id }") {
+        sku: Sku!
+        price: Int!
+      }
+
+      type Sku {
+        id: ID!
+        value: String!
+      }
+    `,
+    name: 'serviceB',
+  };
+
+  const { schema, errors } = composeAndValidate([serviceA, serviceB]);
+  expect(errors).toHaveLength(0);
+
+  const review = schema.getType('Review') as GraphQLObjectType;
+  expect(getFederationMetadata(review.getFields()['product']).provides)
+    .toMatchInlineSnapshot(`
+      sku {
+        id
+      }
+    `);
+});
+
 
 it('errors when a type extension has no base', () => {
   const serviceA = {

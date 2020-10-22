@@ -40,7 +40,7 @@ pub async fn execute_query_plan<'req>(
     };
 
     let data = data_lock.into_inner().unwrap();
-    Ok(GraphQLResponse { data: Some(data) })
+    Ok(GraphQLResponse { data, errors: None })
 }
 
 fn execute_node<'schema, 'request>(

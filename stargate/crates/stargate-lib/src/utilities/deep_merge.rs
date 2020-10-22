@@ -37,6 +37,52 @@ pub(crate) fn merge(target: &mut Value, source: &Value) {
     }
 }
 
+pub(crate) fn merge2(target: &mut Value, source: Value) {
+    if source.is_null() {
+        return;
+    }
+
+    // TODO(ran) FIXME: warn on mismatching types
+    match target {
+        Value::Object(ref mut map) if source.is_object() => {
+            let source = letp!(Value::Object(source) = source => source);
+            for (key, source_value) in source.into_iter() {
+                let target_value = map.entry(key.as_str()).or_insert_with(|| Value::Null);
+                if !target_value.is_null() && (source_value.is_object() || source_value.is_array())
+                {
+                    merge2(target_value, source_value);
+                } else {
+                    *target_value = source_value;
+                }
+            }
+        }
+        Value::Array(ref mut array) if source.is_array() => {
+            let mut source = letp!(Value::Array(source) = source => source);
+            match (array.len(), source.len()) {
+                (x, y) if x == y => {
+                    for (src, target) in source.into_iter().zip(array) {
+                        merge2(target, src)
+                    }
+                }
+                (x, y) if x < y => {
+                    let rest = source.split_off(array.len());
+                    for (src, target) in source.into_iter().zip(array.iter_mut()) {
+                        merge2(target, src)
+                    }
+                    array.extend(rest)
+                }
+                (x, y) if x > y => {
+                    for (index, item) in source.into_iter().enumerate() {
+                        merge2(array.get_mut(index).unwrap(), item)
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+        _ => *target = source,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

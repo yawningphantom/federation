@@ -16,6 +16,7 @@ macro_rules! get_directive {
     };
 }
 
+#[macro_export]
 macro_rules! letp {
     ($pat:pat = $expr:expr => $stmt:stmt ) => {
         if let $pat = $expr {

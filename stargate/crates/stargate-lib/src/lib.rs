@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate apollo_query_planner;
+
 use crate::request_pipeline::executor::execute_query_plan;
 use crate::request_pipeline::service_definition::ServiceDefinition;
 use crate::transports::http::{GraphQLResponse, RequestContext};

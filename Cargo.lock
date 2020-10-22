@@ -419,6 +419,7 @@ name = "apollo-stargate-lib"
 version = "0.1.0"
 dependencies = [
  "apollo-query-planner",
+ "async-lock",
  "async-trait",
  "futures",
  "graphql-parser",
@@ -518,6 +519,15 @@ dependencies = [
  "vec-arena",
  "waker-fn",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "async-lock"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1996609732bde4a9988bc42125f55f2af5f3c36370e27c778d5191a4a1b63bfb"
+dependencies = [
+ "event-listener",
 ]
 
 [[package]]

@@ -156,3 +156,13 @@ mod tests {
         assert!(result.is_ok());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_something() {
+        let mut a = vec![1, 2, 3];
+        a.iter_mut().for_each(|x| *x = *x * 2);
+        println!("{:?}", a);
+    }
+}

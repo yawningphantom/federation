@@ -15,6 +15,7 @@ apollo-query-planner = { path = "../query-planner" }
 graphql-parser = { path = "../graphql-parser" }
 
 # 3rd party
+async-lock = "2.3.0"
 async-trait = "0.1.41"
 futures = "0.3.7"
 http = "0.2.1"

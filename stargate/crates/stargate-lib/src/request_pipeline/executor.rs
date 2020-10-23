@@ -212,9 +212,7 @@ async fn execute_fetch<'schema, 'req>(
     if let Some(requires) = &fetch.requires {
         let mut representations: Vec<Value> = vec![];
         if variables.contains_key("representations") {
-            unimplemented!(
-                "Need to throw here because `Variables cannot contain key 'represenations'"
-            );
+            panic!("Need to throw here because `Variables cannot contain key 'represenations'");
         }
 
         let results = response_lock.read().await;
@@ -272,7 +270,7 @@ async fn execute_fetch<'schema, 'req>(
                 _ => {}
             }
         } else {
-            unimplemented!("Expexected data._entities to contain elements");
+            panic!("Expexected data._entities to contain elements");
         }
     } else {
         let mut results_to_merge = response_lock.write().await;
@@ -315,7 +313,7 @@ fn execute_selection_set(source: &Value, selections: &SelectionSet) -> Value {
                         result[response_name] = serde_json::to_value(response_value).unwrap();
                     }
                 } else {
-                    unimplemented!("Field was not found in response");
+                    panic!("Field '{}' was not found in response", response_name);
                 }
             }
             InlineFragment(fragment) => {
@@ -336,3 +334,6 @@ fn execute_selection_set(source: &Value, selections: &SelectionSet) -> Value {
 
     result
 }
+
+// TODO(ran) FIXME: update message on various unreachable!s
+// TODO(ran) FIXME: replace panics with Error

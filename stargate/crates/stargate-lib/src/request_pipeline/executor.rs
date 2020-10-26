@@ -10,7 +10,7 @@ use async_lock::RwLock;
 use futures::future::{BoxFuture, FutureExt};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use tracing::instrument;
+use tracing::{instrument, trace};
 
 pub struct ExecutionContext<'schema, 'req> {
     service_map: &'schema HashMap<String, ServiceDefinition>,
@@ -29,6 +29,7 @@ pub async fn execute_query_plan<'req>(
     };
 
     let data_lock: RwLock<GraphQLResponse> = RwLock::new(GraphQLResponse::default());
+    trace!("QueryPlan: {}", serde_json::to_string(query_plan).unwrap());
 
     if let Some(ref node) = query_plan.node {
         execute_node(&context, node, &data_lock, &vec![]).await;
@@ -49,10 +50,10 @@ fn execute_node<'schema, 'req>(
     async move {
         match node {
             PlanNode::Fetch(fetch_node) => {
-                let _fetch_result = execute_fetch(context, &fetch_node, response_lock).await;
-                //   if fetch_result.is_err() {
-                //       context.errors.push(fetch_result.errors)
-                //   }
+                let result = execute_fetch(context, &fetch_node, response_lock).await;
+                if let Err(_e) = result {
+                    unimplemented!("Handle error")
+                }
             }
             PlanNode::Flatten(flatten_node) => {
                 let mut flattend_path = Vec::from(path.as_slice());
@@ -110,7 +111,7 @@ fn execute_node<'schema, 'req>(
                 {
                     let mut response_write_guard = response_lock.write().await;
                     let sliced_response = inner_lock.into_inner();
-                    merge_flattend_results(
+                    merge_flattend_responses(
                         &mut *response_write_guard,
                         sliced_response,
                         &flatten_node.path,
@@ -135,7 +136,7 @@ fn execute_node<'schema, 'req>(
     .boxed()
 }
 
-fn merge_flattend_results(
+fn merge_flattend_responses(
     parent_response: &mut GraphQLResponse,
     child_response: GraphQLResponse,
     path: &[String],
@@ -148,45 +149,31 @@ fn merge_flattend_results(
         }
     }
 
-    fn merge_flattend_data(parent_data: &mut Value, child_data: Value, path: &[String]) {
+    fn merge_data(parent_data: &mut Value, child_data: &Value, path: &[String]) {
         if path.is_empty() || child_data.is_null() {
             merge(&mut *parent_data, &child_data);
             return;
         }
 
-        if let Some((path_head, path_tail)) = path.split_first() {
-            if path_head == "@" {
+        if let Some((current, rest)) = path.split_first() {
+            if current == "@" {
                 if parent_data.is_array() && child_data.is_array() {
-                    let child_array = letp!(Value::Array(a) = child_data => a);
-                    assert_eq!(
-                        parent_data.as_array().unwrap().len(),
-                        child_array.len(),
-                        "parent and child are not the same length"
-                    );
-
-                    parent_data
-                        .as_array_mut()
-                        .unwrap()
-                        .iter_mut()
-                        .zip(child_array.into_iter())
-                        .for_each(|(parent_entity, child_entity)| {
-                            merge_flattend_data(parent_entity, child_entity, path_tail)
-                        });
-                } else {
-                    unreachable!(
-                        "merge_flattend_data trying to merge mismatching values, path has `@` but parent/child is not array."
-                    )
+                    let parent_array = parent_data.as_array_mut().unwrap();
+                    for index in 0..parent_array.len() {
+                        if let Some(child_item) = child_data.get(index) {
+                            let parent_item = parent_data.get_mut(index).unwrap();
+                            merge_data(parent_item, child_item, &rest.to_owned());
+                        }
+                    }
                 }
-            } else if parent_data.get(&path_head).is_some() {
-                let inner = parent_data.get_mut(&path_head).unwrap();
-                merge_flattend_data(inner, child_data, path_tail);
-            } else {
-                unreachable!("merge_flattend_data trying to merge mismatching values")
+            } else if parent_data.get(&current).is_some() {
+                let inner: &mut Value = parent_data.get_mut(&current).unwrap();
+                merge_data(inner, child_data, &rest.to_owned());
             }
         }
     }
 
-    merge_flattend_data(&mut parent_response.data, child_response.data, path)
+    merge_data(&mut parent_response.data, &child_response.data, path)
 }
 
 async fn execute_fetch<'schema, 'req>(
@@ -209,63 +196,47 @@ async fn execute_fetch<'schema, 'req>(
 
     let mut representations_to_entity: Vec<usize> = vec![];
 
-    if let Some(requires) = &fetch.requires {
-        let mut representations: Vec<Value> = vec![];
+    let variables = if let Some(requires) = fetch.requires.as_ref() {
         if variables.contains_key("representations") {
-            panic!("Need to throw here because `Variables cannot contain key 'represenations'");
+            panic!("variables must not contain key named 'represenations'");
         }
 
-        let results = response_lock.read().await;
-
-        // TODO(ran) FIXME: QQQ: What's the process here? how could results be an array?
-        //  What is the existence of __typename tell us?
-        let representation_variables = match &results.data {
-            Value::Array(entities) => {
-                for (index, entity) in entities.iter().enumerate() {
-                    let representation = execute_selection_set(entity, requires);
-                    if representation.is_object() && representation.get("__typename").is_some() {
-                        representations.push(representation);
-                        representations_to_entity.push(index);
-                    }
-                }
-                Value::Array(representations)
-            }
-            Value::Object(_) => {
-                let representation = execute_selection_set(&results.data, requires);
-                if representation.is_object() && representation.get("__typename").is_some() {
-                    representations.push(representation);
-                    representations_to_entity.push(0);
-                }
-                Value::Array(representations)
-            }
-            _ => {
-                println!("In empty match line 199");
-                Value::Array(vec![])
-            }
-        };
-
-        variables.insert("representations".to_string(), representation_variables);
-    }
+        update_variables_with_representations(
+            variables,
+            response_lock,
+            requires,
+            &mut representations_to_entity,
+        )
+        .await
+    } else {
+        variables
+    };
 
     let data_received = service
         .send_operation(context.request_context, fetch.operation.clone(), variables)
         .await?;
 
-    if let Some(_requires) = &fetch.requires {
+    if fetch.requires.is_some() {
         if let Some(recieved_entities) = data_received.get("_entities") {
             let mut entities_to_merge = response_lock.write().await;
-            match &(*entities_to_merge).data {
-                Value::Array(_entities) => {
-                    let entities = entities_to_merge.data.as_array_mut().unwrap();
-                    for index in 0..entities.len() {
-                        if let Some(rep_index) = representations_to_entity.get(index) {
-                            let result = entities.get_mut(*rep_index).unwrap();
-                            merge(result, &recieved_entities[index]);
+            let data = &mut (*entities_to_merge).data;
+            trace!(
+                "{{\"merge\": {}, \"into entities\": {}, \"with indexes\": {:?}}}",
+                serde_json::to_string(recieved_entities).unwrap(),
+                serde_json::to_string(data).unwrap(),
+                representations_to_entity
+            );
+            match data {
+                Value::Array(entities) => {
+                    for (repr_idx, entity_idx) in representations_to_entity.into_iter().enumerate()
+                    {
+                        if let Some(entity) = entities.get_mut(entity_idx) {
+                            merge(entity, &recieved_entities[repr_idx]);
                         }
                     }
                 }
-                Value::Object(_entity) => {
-                    merge(&mut (*entities_to_merge).data, &recieved_entities[0]);
+                Value::Object(_) => {
+                    merge(data, &recieved_entities[0]);
                 }
                 _ => {}
             }
@@ -313,7 +284,11 @@ fn execute_selection_set(source: &Value, selections: &SelectionSet) -> Value {
                         result[response_name] = serde_json::to_value(response_value).unwrap();
                     }
                 } else {
-                    panic!("Field '{}' was not found in response", response_name);
+                    panic!(
+                        "Field '{}' was not found in response {}",
+                        response_name,
+                        serde_json::to_string(source).unwrap()
+                    );
                 }
             }
             InlineFragment(fragment) => {
@@ -333,6 +308,44 @@ fn execute_selection_set(source: &Value, selections: &SelectionSet) -> Value {
     }
 
     result
+}
+
+async fn update_variables_with_representations(
+    mut variables: HashMap<String, Value>,
+    response: &RwLock<GraphQLResponse>,
+    requires: &SelectionSet,
+    representations_to_entity: &mut Vec<usize>,
+) -> HashMap<String, Value> {
+    let mut representations: Vec<Value> = vec![];
+
+    let mut update_with_entity = |idx: usize, entity: &Value| {
+        let representation = execute_selection_set(entity, requires);
+        if representation.is_object() && representation.get("__typename").is_some() {
+            representations.push(representation);
+            representations_to_entity.push(idx);
+        }
+    };
+
+    let read_guard = response.read().await;
+    let data = &read_guard.data;
+
+    match data {
+        Value::Array(entities) => {
+            for (index, entity) in entities.iter().enumerate() {
+                update_with_entity(index, entity);
+            }
+        }
+        entity @ Value::Object(_) => {
+            update_with_entity(0, entity);
+        }
+        v => unreachable!("`data` can only be an object or an array, data: {}", v),
+    };
+
+    variables.insert(
+        String::from("representations"),
+        Value::Array(representations),
+    );
+    variables
 }
 
 // TODO(ran) FIXME: update message on various unreachable!s

@@ -56,27 +56,24 @@ pub(crate) fn merge2(target: &mut Value, source: Value) {
                 }
             }
         }
-        Value::Array(ref mut array) if source.is_array() => {
+        Value::Array(ref mut target) if source.is_array() => {
             let mut source = letp!(Value::Array(source) = source => source);
-            match (array.len(), source.len()) {
-                (x, y) if x == y => {
-                    for (src, target) in source.into_iter().zip(array) {
-                        merge2(target, src)
-                    }
+            let source_len = source.len();
+            let target_len = target.len();
+            if source_len == target_len {
+                for (src, target) in source.into_iter().zip(target) {
+                    merge2(target, src)
                 }
-                (x, y) if x < y => {
-                    let rest = source.split_off(array.len());
-                    for (src, target) in source.into_iter().zip(array.iter_mut()) {
-                        merge2(target, src)
-                    }
-                    array.extend(rest)
+            } else if source_len > target_len {
+                let rest = source.split_off(target.len());
+                for (src, target) in source.into_iter().zip(target.iter_mut()) {
+                    merge2(target, src)
                 }
-                (x, y) if x > y => {
-                    for (index, item) in source.into_iter().enumerate() {
-                        merge2(array.get_mut(index).unwrap(), item)
-                    }
+                target.extend(rest)
+            } else {
+                for (target, src) in target.iter_mut().zip(source) {
+                    merge2(target, src)
                 }
-                _ => unreachable!(),
             }
         }
         _ => *target = source,

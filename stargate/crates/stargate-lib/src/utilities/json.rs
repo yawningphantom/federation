@@ -8,26 +8,6 @@ pub enum JsonSliceValue<'a> {
 
 // TODO(ran) FIXME: test this.
 impl<'a> JsonSliceValue<'a> {
-    // TODO(ran) FIXME: uncomment or delete
-    // pub fn slice(&self, path: &[String]) -> JsonSliceValue<'a> {
-    //     if path.is_empty() {
-    //         self.clone()
-    //     } else {
-    //         match self {
-    //             JsonSliceValue::Value(value) => JsonSliceValue::from_path_and_value(path, *value),
-    //             JsonSliceValue::Array(arr) => {
-    //                 if path[0] != "@" {
-    //                     panic!("slice called on JsonSliceValue::Array where the first path element is not @")
-    //                 }
-    //
-    //                 let (_, tail) = path.split_first().unwrap();
-    //
-    //                 JsonSliceValue::Array(arr.iter().map(|v| v.slice(tail)).collect())
-    //             }
-    //         }
-    //     }
-    // }
-
     pub fn from_path_and_value(path: &[String], value: &'a Value) -> JsonSliceValue<'a> {
         if path.is_empty() {
             JsonSliceValue::from(value)

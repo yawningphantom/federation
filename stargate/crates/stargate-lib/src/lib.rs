@@ -55,7 +55,9 @@ impl<'app> Stargate<'app> {
     ) -> Result<GraphQLResponse> {
         // TODO(ran) FIXME: gql validation on query
         // TODO(james) actual request pipeline here
-        let options = QueryPlanningOptionsBuilder::default().build().unwrap();
+        let options = QueryPlanningOptionsBuilder::default()
+            .build()
+            .expect("building can't fail");
         let plan = self
             .planner
             .plan(&request_context.graphql_request.query, options)
@@ -75,22 +77,22 @@ fn get_service_list(schema: &schema::Document) -> HashMap<String, ServiceDefinit
         })
         .last();
 
-    if schema_defintion.is_none() {
+    if let Some(schema_defintion) = schema_defintion {
+        apollo_query_planner::get_directive!(schema_defintion.directives, "graph")
+            .map(|owner_dir| directive_args_as_map(&owner_dir.arguments))
+            .map(|args| {
+                (
+                    String::from(args["name"]),
+                    ServiceDefinition {
+                        url: String::from(args["url"]),
+                        client: Client::new(),
+                    },
+                )
+            })
+            .collect()
+    } else {
         todo!("handle error case")
     }
-
-    apollo_query_planner::get_directive!(schema_defintion.unwrap().directives, "graph")
-        .map(|owner_dir| directive_args_as_map(&owner_dir.arguments))
-        .map(|args| {
-            (
-                String::from(args["name"]),
-                ServiceDefinition {
-                    url: String::from(args["url"]),
-                    client: Client::new(),
-                },
-            )
-        })
-        .collect()
 }
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;

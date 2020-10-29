@@ -29,7 +29,10 @@ pub async fn execute_query_plan<'req>(
     };
 
     let data_lock: RwLock<GraphQLResponse> = RwLock::new(GraphQLResponse::default());
-    trace!("QueryPlan: {}", serde_json::to_string(query_plan).unwrap());
+    trace!(
+        "QueryPlan: {}",
+        serde_json::to_string(query_plan).expect("QueryPlan must serde")
+    );
 
     if let Some(ref node) = query_plan.node {
         execute_node(&context, node, &data_lock, &vec![]).await;
@@ -157,17 +160,16 @@ fn merge_flattend_responses(
 
         if let Some((current, rest)) = path.split_first() {
             if current == "@" {
-                if parent_data.is_array() && child_data.is_array() {
-                    let parent_array = parent_data.as_array_mut().unwrap();
-                    for index in 0..parent_array.len() {
-                        if let Some(child_item) = child_data.get(index) {
-                            let parent_item = parent_data.get_mut(index).unwrap();
-                            merge_data(parent_item, child_item, &rest.to_owned());
+                if let Value::Array(parent_array) = parent_data {
+                    if child_data.is_array() {
+                        for (index, parent_item) in parent_array.iter_mut().enumerate() {
+                            if let Some(child_item) = child_data.get(index) {
+                                merge_data(parent_item, child_item, rest)
+                            }
                         }
                     }
                 }
-            } else if parent_data.get(&current).is_some() {
-                let inner: &mut Value = parent_data.get_mut(&current).unwrap();
+            } else if let Some(inner) = parent_data.get_mut(current) {
                 merge_data(inner, child_data, &rest.to_owned());
             }
         }
@@ -223,8 +225,8 @@ async fn execute_fetch<'schema, 'req>(
             let data = &mut (*entities_to_merge).data;
             trace!(
                 "{{\"merge\": {}, \"into entities\": {}, \"with indexes\": {:?}}}",
-                serde_json::to_string(recieved_entities).unwrap(),
-                serde_json::to_string(data).unwrap(),
+                recieved_entities.to_string(),
+                data.to_string(),
                 representations_to_entity
             );
             match data {
@@ -282,13 +284,13 @@ fn execute_selection_set(source: &Value, selections: &SelectionSet) -> Value {
                     } else if let Some(ref selections) = field.selections {
                         result[response_name] = execute_selection_set(response_value, selections);
                     } else {
-                        result[response_name] = serde_json::to_value(response_value).unwrap();
+                        result[response_name] = response_value.clone();
                     }
                 } else {
                     panic!(
                         "Field '{}' was not found in response {}",
                         response_name,
-                        serde_json::to_string(source).unwrap()
+                        source.to_string()
                     );
                 }
             }
@@ -296,7 +298,8 @@ fn execute_selection_set(source: &Value, selections: &SelectionSet) -> Value {
                 // TODO(ran) FIXME: QQQ if there's no type_condition, we don't recurse?
                 if let Some(ref type_condition) = fragment.type_condition {
                     if let Some(typename) = source.get("__typename") {
-                        if typename.as_str().unwrap() == type_condition {
+                        let typename = typename.as_str().expect("__typename's type must be String");
+                        if typename == type_condition {
                             merge(
                                 &mut result,
                                 &execute_selection_set(source, &fragment.selections),

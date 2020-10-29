@@ -212,13 +212,14 @@ async fn execute_fetch<'schema, 'req>(
         variables
     };
 
-    let data_received = service
+    let response_received = service
         .send_operation(context.request_context, fetch.operation.clone(), variables)
         .await?;
 
     if fetch.requires.is_some() {
-        if let Some(recieved_entities) = data_received.get("_entities") {
+        if let Some(recieved_entities) = response_received.data.get("_entities") {
             let mut entities_to_merge = response_lock.write().await;
+            entities_to_merge.merge_errors(response_received.errors);
             let data = &mut (*entities_to_merge).data;
             trace!(
                 "{{\"merge\": {}, \"into entities\": {}, \"with indexes\": {:?}}}",
@@ -245,7 +246,7 @@ async fn execute_fetch<'schema, 'req>(
         }
     } else {
         let mut results_to_merge = response_lock.write().await;
-        merge(&mut (*results_to_merge).data, &data_received);
+        results_to_merge.merge(response_received);
     }
 
     Ok(())

@@ -22,14 +22,21 @@ pub struct GraphQLResponse {
 }
 
 impl GraphQLResponse {
+    pub fn merge(&mut self, other: Self) {
+        self.merge_data(other.data);
+        self.merge_errors(other.errors);
+    }
+
     pub fn merge_data(&mut self, data: Value) {
         merge2(&mut self.data, data)
     }
 
-    pub fn merge_errors(&mut self, errors: Vec<GraphQLError>) {
-        match self.errors {
-            None => self.errors = Some(errors),
-            Some(ref mut self_errors) => self_errors.extend(errors.into_iter()),
+    pub fn merge_errors(&mut self, errors: Option<Vec<GraphQLError>>) {
+        if let Some(errors) = errors {
+            match self.errors {
+                None => self.errors = Some(errors),
+                Some(ref mut self_errors) => self_errors.extend(errors.into_iter()),
+            }
         }
     }
 }

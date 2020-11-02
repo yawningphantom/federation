@@ -4,6 +4,7 @@ use serde_json::Value;
 pub enum JsonSliceValue<'a> {
     Value(&'a serde_json::Value),
     Array(Vec<JsonSliceValue<'a>>),
+    Null,
 }
 
 // TODO(ran) FIXME: test this.
@@ -18,6 +19,10 @@ impl<'a> JsonSliceValue<'a> {
                         array_value
                             .iter()
                             .map(|v| JsonSliceValue::from_path_and_value(tail, v))
+                            // .flat_map(|v| match JsonSliceValue::from_path_and_value(tail, v) {
+                            //     JsonSliceValue::Array(arr) => arr,
+                            //     other => vec![other],
+                            // })
                             .collect(),
                     )
                 } else {
@@ -29,14 +34,12 @@ impl<'a> JsonSliceValue<'a> {
             } else if let Some(v) = value.get(head) {
                 JsonSliceValue::from_path_and_value(tail, v)
             } else {
-                // TODO(ran) FIXME: This shouldn't panic because we may slice into fields that are
-                //  only available on some type conditions. Consider having a more typed approach?
                 tracing::debug!(
                     "Attempting to slice with '{}' but there is no key by that name: {}",
                     head,
                     value
                 );
-                JsonSliceValue::Value(value)
+                JsonSliceValue::Null
             }
         } else {
             unreachable!("verified path is not empty.")
@@ -49,6 +52,8 @@ impl<'a> JsonSliceValue<'a> {
             JsonSliceValue::Array(arr) => {
                 Value::Array(arr.into_iter().map(|v| v.into_value()).collect())
             }
+            // JsonSliceValue::Null => unreachable!("Nulls should have all been filtered"),
+            JsonSliceValue::Null => Value::Null,
         }
     }
 }

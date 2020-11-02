@@ -1,6 +1,6 @@
 use crate::request_pipeline::service_definition::{Service, ServiceDefinition};
 use crate::transports::http::{GraphQLResponse, RequestContext};
-use crate::utilities::deep_merge::merge;
+use crate::utilities::deep_merge::{merge, merge2};
 use crate::utilities::json::JsonSliceValue;
 use crate::Result;
 use apollo_query_planner::model::Selection::Field;
@@ -89,6 +89,7 @@ fn execute_node<'schema, 'req>(
                         &response_read_guard.data,
                     );
 
+                    dbg!(slice.clone().into_value());
                     let mut inner_response_write_guard = inner_lock.write().await;
                     *inner_response_write_guard = GraphQLResponse {
                         data: slice.into_value(),
@@ -97,6 +98,7 @@ fn execute_node<'schema, 'req>(
                 }
 
                 execute_node(context, &flatten_node.node, &inner_lock, &flattend_path).await;
+                dbg!(&inner_lock.read().await.data);
 
                 // once the node has been executed, we need to restitch it back to the parent
                 // node on the tree of result data
@@ -152,30 +154,38 @@ fn merge_flattend_responses(
         }
     }
 
-    fn merge_data(parent_data: &mut Value, child_data: &Value, path: &[String]) {
+    fn merge_data(parent_data: &mut Value, child_data: Value, path: &[String]) {
+        dbg!(
+            "------------------------------------------------",
+            &parent_data,
+            &child_data,
+            &path
+        );
         if path.is_empty() || child_data.is_null() {
-            merge(&mut *parent_data, &child_data);
+            merge2(parent_data, child_data);
             return;
         }
 
         if let Some((current, rest)) = path.split_first() {
             if current == "@" {
                 if let Value::Array(parent_array) = parent_data {
-                    if child_data.is_array() {
-                        for (index, parent_item) in parent_array.iter_mut().enumerate() {
-                            if let Some(child_item) = child_data.get(index) {
-                                merge_data(parent_item, child_item, rest)
-                            }
+                    if let Value::Array(child_array) = child_data {
+                        for (parent_item, child_item) in
+                            parent_array.iter_mut().zip(child_array.into_iter())
+                        {
+                            merge_data(parent_item, child_item, rest)
                         }
                     }
+                } else {
+                    todo!("Not sure this is reachable?")
                 }
             } else if let Some(inner) = parent_data.get_mut(current) {
-                merge_data(inner, child_data, &rest.to_owned());
+                merge_data(inner, child_data, rest);
             }
         }
     }
 
-    merge_data(&mut parent_response.data, &child_response.data, path)
+    merge_data(&mut parent_response.data, child_response.data, path);
 }
 
 async fn execute_fetch<'schema, 'req>(
@@ -254,27 +264,26 @@ async fn execute_fetch<'schema, 'req>(
     Ok(())
 }
 
-fn execute_selection_set(source: &Value, selections: &SelectionSet) -> Value {
-    if source.is_null() {
+fn execute_selection_set(entity: &Value, requires: &SelectionSet) -> Value {
+    if entity.is_null() {
         return Value::default();
     }
 
     let mut result: Value = json!({});
 
-    for selection in selections {
+    for selection in requires {
         match selection {
             Field(field) => {
                 let response_name = field.alias.as_ref().unwrap_or(&field.name);
 
-                if let Some(response_value) = source.get(response_name) {
+                if let Some(response_value) = entity.get(response_name) {
                     if let Value::Array(inner) = response_value {
                         result[response_name] = Value::Array(
                             inner
                                 .iter()
                                 .map(|element| {
-                                    if field.selections.is_some() {
-                                        // TODO(ran) FIXME: QQQ Should this be `field.selections` ?
-                                        execute_selection_set(element, selections)
+                                    if let Some(sub_selections) = &field.selections {
+                                        execute_selection_set(element, sub_selections)
                                     } else {
                                         element.clone()
                                     }
@@ -290,19 +299,19 @@ fn execute_selection_set(source: &Value, selections: &SelectionSet) -> Value {
                     panic!(
                         "Field '{}' was not found in response {}",
                         response_name,
-                        source.to_string()
+                        entity.to_string()
                     );
                 }
             }
             InlineFragment(fragment) => {
                 // TODO(ran) FIXME: QQQ if there's no type_condition, we don't recurse?
                 if let Some(ref type_condition) = fragment.type_condition {
-                    if let Some(typename) = source.get("__typename") {
+                    if let Some(typename) = entity.get("__typename") {
                         let typename = typename.as_str().expect("__typename's type must be String");
                         if typename == type_condition {
                             merge(
                                 &mut result,
-                                &execute_selection_set(source, &fragment.selections),
+                                &execute_selection_set(entity, &fragment.selections),
                             );
                         }
                     }

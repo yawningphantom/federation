@@ -53,74 +53,15 @@ fn execute_node<'schema, 'req>(
     async move {
         match node {
             PlanNode::Fetch(fetch_node) => {
-                let result = execute_fetch(context, &fetch_node, response_lock).await;
+                let result = execute_fetch(context, fetch_node, response_lock).await;
                 if let Err(_e) = result {
-                    unimplemented!("Handle error")
+                    unimplemented!("Handle fetch error")
                 }
             }
             PlanNode::Flatten(flatten_node) => {
-                let mut flattend_path = Vec::from(path.as_slice());
-                flattend_path.extend_from_slice(flatten_node.path.as_slice());
-
-                let inner_lock: RwLock<GraphQLResponse> = RwLock::new(GraphQLResponse::default());
-
-                /*
-                    Flatten works by selecting a zip of the result tree from the
-                    path on the node (i.e [topProducts, @]) and creating a temporary
-                    RwLock JSON object for the data currently stored there. Then we proceed
-                    with executing the result of the node tree in the plan. Once the nodes have
-                    been executed, we restitch the temporary JSON back into the parent result tree
-                    at the same point using the flatten path
-
-                    results_to_flatten = {
-                        topProducts: [
-                            { __typename: "Book", isbn: "1234" }
-                        ]
-                    }
-
-                    inner_to_merge = {
-                        { __typename: "Book", isbn: "1234" }
-                    }
-                */
-                {
-                    let response_read_guard = response_lock.read().await;
-                    let slice = JsonSliceValue::from_path_and_value(
-                        &flatten_node.path,
-                        &response_read_guard.data,
-                    );
-
-                    dbg!(slice.clone().into_value());
-                    let mut inner_response_write_guard = inner_lock.write().await;
-                    *inner_response_write_guard = GraphQLResponse {
-                        data: slice.into_value(),
-                        errors: None,
-                    };
-                }
-
-                execute_node(context, &flatten_node.node, &inner_lock, &flattend_path).await;
-                dbg!(&inner_lock.read().await.data);
-
-                // once the node has been executed, we need to restitch it back to the parent
-                // node on the tree of result data
-                /*
-                    results_to_flatten = {
-                        topProducts: []
-                    }
-
-                    inner_to_merge = {
-                        { __typename: "Book", isbn: "1234", name: "Best book ever" }
-                    }
-
-                    path = [topProducts, @]
-                */
-                {
-                    let mut response_write_guard = response_lock.write().await;
-                    let sliced_response = inner_lock.into_inner();
-                    merge_flattend_responses(
-                        &mut *response_write_guard,
-                        sliced_response,
-                        &flatten_node.path,
-                    );
+                let result = execute_flatten(context, flatten_node, response_lock).await;
+                if let Err(_e) = result {
+                    unimplemented!("Handle flatten error")
                 }
             }
             PlanNode::Sequence { nodes } => {
@@ -141,6 +82,82 @@ fn execute_node<'schema, 'req>(
     .boxed()
 }
 
+async fn execute_flatten<'schema, 'req>(
+    context: &ExecutionContext<'schema, 'req>,
+    flatten_node: &'req FlattenNode,
+    response_lock: &'req RwLock<GraphQLResponse>,
+) -> Result<()> {
+    let inner_lock: RwLock<GraphQLResponse> = RwLock::new(GraphQLResponse::default());
+
+    /*
+        Flatten works by selecting a zip of the result tree from the
+        path on the node (i.e [topProducts, @]) and creating a temporary
+        RwLock JSON object for the data currently stored there. Then we proceed
+        with executing the result of the node tree in the plan. Once the nodes have
+        been executed, we restitch the temporary JSON back into the parent result tree
+        at the same point using the flatten path
+
+        results_to_flatten = {
+            topProducts: [
+                { __typename: "Book", isbn: "1234" }
+            ]
+        }
+
+        inner_to_merge = {
+            { __typename: "Book", isbn: "1234" }
+        }
+    */
+    {
+        let response_read_guard = response_lock.read().await;
+        let slice =
+            JsonSliceValue::from_path_and_value(&flatten_node.path, &response_read_guard.data);
+
+        dbg!(slice.clone().into_value());
+        let mut inner_response_write_guard = inner_lock.write().await;
+        *inner_response_write_guard = GraphQLResponse {
+            data: slice.into_value(),
+            errors: None,
+        };
+    }
+
+    if let PlanNode::Fetch(fetch) = &flatten_node.node.as_ref() {
+        let result = execute_entities_fetch(context, fetch, &inner_lock).await;
+        if let Err(_e) = result {
+            unimplemented!("Handle error")
+        }
+    } else {
+        panic!("A node in a Flatten is always a Fetch")
+    }
+
+    // execute_node(context, &flatten_node.node, &inner_lock, &flattend_path).await;
+    dbg!(&inner_lock.read().await.data);
+
+    // once the node has been executed, we need to restitch it back to the parent
+    // node on the tree of result data
+    /*
+        results_to_flatten = {
+            topProducts: []
+        }
+
+        inner_to_merge = {
+            { __typename: "Book", isbn: "1234", name: "Best book ever" }
+        }
+
+        path = [topProducts, @]
+    */
+    {
+        let mut response_write_guard = response_lock.write().await;
+        let sliced_response = inner_lock.into_inner();
+        merge_flattend_responses(
+            &mut *response_write_guard,
+            sliced_response,
+            &flatten_node.path,
+        );
+    }
+
+    Ok(())
+}
+
 fn merge_flattend_responses(
     parent_response: &mut GraphQLResponse,
     child_response: GraphQLResponse,
@@ -157,9 +174,9 @@ fn merge_flattend_responses(
     fn merge_data(parent_data: &mut Value, child_data: Value, path: &[String]) {
         dbg!(
             "------------------------------------------------",
+            &path,
             &parent_data,
             &child_data,
-            &path
         );
         if path.is_empty() || child_data.is_null() {
             merge2(parent_data, child_data);
@@ -193,72 +210,96 @@ async fn execute_fetch<'schema, 'req>(
     fetch: &FetchNode,
     response_lock: &'req RwLock<GraphQLResponse>,
 ) -> Result<()> {
+    if fetch.requires.is_some() {
+        panic!("we expect fetch.requires to only defined be on an _entities fetch")
+    }
+
     let service = &context.service_map[&fetch.service_name];
 
     let mut variables: HashMap<String, Value> = HashMap::new();
-    if !fetch.variable_usages.is_empty() {
+    if let Some(vars) = &context.request_context.graphql_request.variables {
         for variable_name in &fetch.variable_usages {
-            if let Some(vars) = &context.request_context.graphql_request.variables {
-                if let Some(variable) = vars.get(&variable_name) {
-                    variables.insert(variable_name.to_string(), variable.clone());
-                }
+            if let Some(variable) = vars.get(&variable_name) {
+                variables.insert(variable_name.to_string(), variable.clone());
+            }
+        }
+    }
+
+    let response_received = service
+        .send_operation(context, fetch.operation.clone(), variables)
+        .await?;
+
+    let mut results_to_merge = response_lock.write().await;
+    results_to_merge.merge(response_received);
+
+    Ok(())
+}
+
+async fn execute_entities_fetch<'schema, 'req>(
+    context: &ExecutionContext<'schema, 'req>,
+    fetch: &FetchNode,
+    response_lock: &'req RwLock<GraphQLResponse>,
+) -> Result<()> {
+    if fetch.requires.is_none() {
+        panic!("_entities fetch without `fetch.requires` ???")
+    }
+
+    let service = &context.service_map[&fetch.service_name];
+
+    let requires = letp!(Some(requires) = fetch.requires.as_ref() => requires);
+
+    let mut variables: HashMap<String, Value> = HashMap::new();
+    if let Some(vars) = &context.request_context.graphql_request.variables {
+        for variable_name in &fetch.variable_usages {
+            if let Some(variable) = vars.get(&variable_name) {
+                variables.insert(variable_name.to_string(), variable.clone());
             }
         }
     }
 
     let mut representations_to_entity: Vec<usize> = vec![];
 
-    let variables = if let Some(requires) = fetch.requires.as_ref() {
-        if variables.contains_key("representations") {
-            panic!("variables must not contain key named 'represenations'");
-        }
+    if variables.contains_key("representations") {
+        panic!("variables must not contain key named 'represenations'");
+    }
 
-        update_variables_with_representations(
-            variables,
-            response_lock,
-            requires,
-            &mut representations_to_entity,
-        )
-        .await
-    } else {
-        variables
-    };
+    update_variables_with_representations(
+        &mut variables,
+        response_lock,
+        requires,
+        &mut representations_to_entity,
+    )
+    .await;
 
     let response_received = service
         .send_operation(context.request_context, fetch.operation.clone(), variables)
         .await?;
 
-    if fetch.requires.is_some() {
-        if let Some(recieved_entities) = response_received.data.get("_entities") {
-            let mut entities_to_merge = response_lock.write().await;
-            entities_to_merge.merge_errors(response_received.errors);
-            let data = &mut (*entities_to_merge).data;
-            trace!(
-                "{{\"merge\": {}, \"into entities\": {}, \"with indexes\": {:?}}}",
-                recieved_entities.to_string(),
-                data.to_string(),
-                representations_to_entity
-            );
-            match data {
-                Value::Array(entities) => {
-                    for (repr_idx, entity_idx) in representations_to_entity.into_iter().enumerate()
-                    {
-                        if let Some(entity) = entities.get_mut(entity_idx) {
-                            merge(entity, &recieved_entities[repr_idx]);
-                        }
+    if let Some(recieved_entities) = response_received.data.get("_entities") {
+        let mut entities_to_merge = response_lock.write().await;
+        entities_to_merge.merge_errors(response_received.errors);
+        let data = &mut (*entities_to_merge).data;
+        trace!(
+            "{{\"merge\": {}, \"into entities\": {}, \"with indexes\": {:?}}}",
+            recieved_entities.to_string(),
+            data.to_string(),
+            representations_to_entity
+        );
+        match data {
+            Value::Array(entities) => {
+                for (repr_idx, entity_idx) in representations_to_entity.into_iter().enumerate() {
+                    if let Some(entity) = entities.get_mut(entity_idx) {
+                        merge(entity, &recieved_entities[repr_idx]);
                     }
                 }
-                Value::Object(_) => {
-                    merge(data, &recieved_entities[0]);
-                }
-                _ => {}
             }
-        } else {
-            panic!("Expexected data._entities to contain elements");
+            Value::Object(_) => {
+                merge(data, &recieved_entities[0]);
+            }
+            _ => {}
         }
     } else {
-        let mut results_to_merge = response_lock.write().await;
-        results_to_merge.merge(response_received);
+        panic!("Expexected data._entities to contain elements");
     }
 
     Ok(())
@@ -324,11 +365,11 @@ fn execute_selection_set(entity: &Value, requires: &SelectionSet) -> Value {
 }
 
 async fn update_variables_with_representations(
-    mut variables: HashMap<String, Value>,
+    variables: &mut HashMap<String, Value>,
     response: &RwLock<GraphQLResponse>,
     requires: &SelectionSet,
     representations_to_entity: &mut Vec<usize>,
-) -> HashMap<String, Value> {
+) {
     let mut representations: Vec<Value> = vec![];
 
     let mut update_with_entity = |idx: usize, entity: &Value| {
@@ -358,7 +399,6 @@ async fn update_variables_with_representations(
         String::from("representations"),
         Value::Array(representations),
     );
-    variables
 }
 
 // TODO(ran) FIXME: update message on various unreachable!s

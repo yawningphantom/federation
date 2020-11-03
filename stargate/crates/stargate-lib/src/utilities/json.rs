@@ -18,11 +18,12 @@ impl<'a> JsonSliceValue<'a> {
                     JsonSliceValue::Array(
                         array_value
                             .iter()
-                            .map(|v| JsonSliceValue::from_path_and_value(tail, v))
-                            // .flat_map(|v| match JsonSliceValue::from_path_and_value(tail, v) {
-                            //     JsonSliceValue::Array(arr) => arr,
-                            //     other => vec![other],
-                            // })
+                            // .map(|v| JsonSliceValue::from_path_and_value(tail, v))
+                            .flat_map(|v| match JsonSliceValue::from_path_and_value(tail, v) {
+                                JsonSliceValue::Array(arr) => arr,
+                                other => vec![other],
+                            })
+                            // .filter(|v| matches!(v, JsonSliceValue::Null))
                             .collect(),
                     )
                 } else {

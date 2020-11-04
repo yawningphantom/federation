@@ -214,7 +214,7 @@ async fn execute_fetch<'schema, 'req>(
     }
 
     let response_received = service
-        .send_operation(context, fetch.operation.clone(), variables)
+        .send_operation(context.request_context, fetch.operation.clone(), variables)
         .await?;
 
     let mut results_to_merge = response_lock.write().await;

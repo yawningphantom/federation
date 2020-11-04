@@ -19,7 +19,7 @@ pub trait Service {
         request_context: &'req RequestContext<'req>,
         operation: String,
         variables: HashMap<String, Value>,
-    ) -> Result<Value>;
+    ) -> Result<GraphQLResponse>;
 }
 
 #[async_trait]
@@ -29,7 +29,7 @@ impl Service for ServiceDefinition {
         request_context: &'req RequestContext<'req>,
         operation: String,
         variables: HashMap<String, Value>,
-    ) -> Result<Value> {
+    ) -> Result<GraphQLResponse> {
         let graphql_request = GraphQLRequest {
             query: operation,
             operation_name: None,
@@ -47,9 +47,8 @@ impl Service for ServiceDefinition {
         }
 
         let response = request.send().await?;
-        let GraphQLResponse { data } = response.json().await?;
-
-        data.ok_or_else(|| unimplemented!("Handle error cases in send_operation"))
+        let r: GraphQLResponse = response.json().await?;
+        Ok(r)
     }
 }
 
@@ -69,8 +68,10 @@ mod tests {
         // Start a background HTTP server on a random local port
         let mock_server = MockServer::start().await;
 
+        // TODO(ran) FIXME: test case with errors not None
         let response = ResponseTemplate::new(200).set_body_json(GraphQLResponse {
-            data: Some(json!({"me": {"id": 1}})),
+            data: json!({"me": {"id": 1}}),
+            errors: None,
         });
 
         let mut mock_builder = Mock::given(method("POST"));
@@ -154,15 +155,5 @@ mod tests {
             .await;
 
         assert!(result.is_ok());
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_something() {
-        let mut a = vec![1, 2, 3];
-        a.iter_mut().for_each(|x| *x = *x * 2);
-        println!("{:?}", a);
     }
 }

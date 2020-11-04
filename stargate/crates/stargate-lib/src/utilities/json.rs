@@ -177,5 +177,7 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect();
+        // TODO(ran) FIXME: assert equality
+        println!("{:?}", jsvm.slice_by_path(&path));
     }
 }

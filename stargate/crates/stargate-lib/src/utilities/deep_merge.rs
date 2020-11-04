@@ -42,6 +42,10 @@ pub(crate) fn merge2(target: &mut Value, source: Value) {
         return;
     }
 
+    if target == &source {
+        return;
+    }
+
     // TODO(ran) FIXME: warn on mismatching types
     match target {
         Value::Object(ref mut map) if source.is_object() => {

@@ -23,7 +23,7 @@ impl<'a> JsonSliceValue<'a> {
                                 JsonSliceValue::Array(arr) => arr,
                                 other => vec![other],
                             })
-                            // .filter(|v| matches!(v, JsonSliceValue::Null))
+                            .filter(|v| !matches!(v, JsonSliceValue::Null))
                             .collect(),
                     )
                 } else {
@@ -53,8 +53,8 @@ impl<'a> JsonSliceValue<'a> {
             JsonSliceValue::Array(arr) => {
                 Value::Array(arr.into_iter().map(|v| v.into_value()).collect())
             }
-            // JsonSliceValue::Null => unreachable!("Nulls should have all been filtered"),
-            JsonSliceValue::Null => Value::Null,
+            JsonSliceValue::Null => unreachable!("Nulls should have all been filtered"),
+            // JsonSliceValue::Null => Value::Null,
         }
     }
 }

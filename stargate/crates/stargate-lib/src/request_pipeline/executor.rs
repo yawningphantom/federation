@@ -126,10 +126,9 @@ async fn execute_flatten<'schema, 'req>(
             unimplemented!("Handle error")
         }
     } else {
-        panic!("A node in a Flatten is always a Fetch")
+        panic!("The node in a Flatten node is always a Fetch node")
     }
 
-    // execute_node(context, &flatten_node.node, &inner_lock, &flattend_path).await;
     dbg!(&inner_lock.read().await.data);
 
     // once the node has been executed, we need to restitch it back to the parent
@@ -178,27 +177,42 @@ fn merge_flattend_responses(
             &parent_data,
             &child_data,
         );
-        if path.is_empty() || child_data.is_null() {
+        if child_data.is_null() {
+            // Nothing to do
+            return;
+        }
+
+        // Path is empty, recursion stop condition, merge data.
+        if path.is_empty() {
             merge2(parent_data, child_data);
             return;
         }
 
-        if let Some((current, rest)) = path.split_first() {
-            if current == "@" {
-                if let Value::Array(parent_array) = parent_data {
-                    if let Value::Array(child_array) = child_data {
-                        for (parent_item, child_item) in
-                            parent_array.iter_mut().zip(child_array.into_iter())
-                        {
-                            merge_data(parent_item, child_item, rest)
-                        }
-                    }
-                } else {
-                    todo!("Not sure this is reachable?")
-                }
-            } else if let Some(inner) = parent_data.get_mut(current) {
+        let (current, rest) = path.split_first().expect("path must not be empty here");
+
+        if current != "@" {
+            if let Some(inner) = parent_data.get_mut(current) {
                 merge_data(inner, child_data, rest);
             }
+            return;
+        }
+
+        // current == "@", multiple ways in which this can go.
+        if let Value::Array(parent_array) = parent_data {
+            if rest.iter().any(|p| p == "@") {
+                // ???
+            } else {
+                if let Value::Array(child_array) = child_data {
+                    let zip = parent_array.iter_mut().zip(child_array.into_iter());
+                    for (parent_item, child_item) in zip {
+                        merge_data(parent_item, child_item, rest)
+                    }
+                } else {
+                    tracing::info!("// TODO(ran) FIXME: child is not array. Good? Bad?")
+                }
+            }
+        } else {
+            todo!("Not sure this is reachable?")
         }
     }
 

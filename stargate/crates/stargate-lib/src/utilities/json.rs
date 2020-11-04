@@ -177,6 +177,5 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect();
-        dbg!(jsvm.slice_by_path(&path));
     }
 }

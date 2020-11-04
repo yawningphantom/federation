@@ -87,8 +87,6 @@ async fn execute_flatten<'schema, 'req>(
     flatten_node: &'req FlattenNode,
     response_lock: &'req RwLock<GraphQLResponse>,
 ) -> Result<()> {
-    let child_lock: RwLock<GraphQLResponse> = RwLock::new(GraphQLResponse::default());
-
     /*
         Flatten works by selecting a zip of the result tree from the
         path on the node (i.e [topProducts, @]) and creating a temporary
@@ -107,29 +105,25 @@ async fn execute_flatten<'schema, 'req>(
             { __typename: "Book", isbn: "1234" }
         }
     */
-    {
+    let inner_response: RwLock<GraphQLResponse> = {
         let response_read_guard = response_lock.read().await;
         let slice =
             JsonSliceValue::from_path_and_value(&flatten_node.path, &response_read_guard.data);
 
-        dbg!(slice.clone().into_value());
-        let mut inner_response_write_guard = child_lock.write().await;
-        *inner_response_write_guard = GraphQLResponse {
+        RwLock::new(GraphQLResponse {
             data: slice.into_value(),
             errors: None,
-        };
-    }
+        })
+    };
 
     if let PlanNode::Fetch(fetch) = &flatten_node.node.as_ref() {
-        let result = execute_entities_fetch(context, fetch, &child_lock).await;
+        let result = execute_entities_fetch(context, fetch, &inner_response).await;
         if let Err(_e) = result {
             unimplemented!("Handle error")
         }
     } else {
         panic!("The node in a Flatten node is always a Fetch node")
     }
-
-    dbg!(&child_lock.read().await.data);
 
     // once the node has been executed, we need to restitch it back to the parent
     // node on the tree of result data
@@ -146,7 +140,7 @@ async fn execute_flatten<'schema, 'req>(
     */
     {
         let mut parent_response_guard = response_lock.write().await;
-        let child_response = child_lock.into_inner();
+        let child_response = inner_response.into_inner();
         merge_flattend_responses(
             &mut *parent_response_guard,
             child_response,
@@ -170,15 +164,8 @@ fn merge_flattend_responses(
         }
     }
 
-    let mut parent_data = &mut parent_response.data;
+    let parent_data = &mut parent_response.data;
     let child_data = child_response.data;
-
-    dbg!(
-        "------------------------------------------------",
-        &path,
-        &parent_data,
-        &child_data,
-    );
 
     if child_data.is_null() {
         // Nothing to do
@@ -300,7 +287,7 @@ async fn execute_entities_fetch<'schema, 'req>(
             _ => {}
         }
     } else {
-        panic!("Expexected data._entities to contain elements");
+        panic!("Expected data._entities to contain elements");
     }
 
     Ok(())

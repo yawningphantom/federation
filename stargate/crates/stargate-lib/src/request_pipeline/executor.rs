@@ -1,7 +1,7 @@
 use crate::request_pipeline::service_definition::{Service, ServiceDefinition};
 use crate::transports::http::{GraphQLResponse, RequestContext};
 use crate::utilities::deep_merge::{merge, merge2};
-use crate::utilities::json::JsonSliceValue;
+use crate::utilities::json::{JsonSliceValue, JsonSliceValueMut};
 use crate::Result;
 use apollo_query_planner::model::Selection::Field;
 use apollo_query_planner::model::Selection::InlineFragment;
@@ -87,7 +87,7 @@ async fn execute_flatten<'schema, 'req>(
     flatten_node: &'req FlattenNode,
     response_lock: &'req RwLock<GraphQLResponse>,
 ) -> Result<()> {
-    let inner_lock: RwLock<GraphQLResponse> = RwLock::new(GraphQLResponse::default());
+    let child_lock: RwLock<GraphQLResponse> = RwLock::new(GraphQLResponse::default());
 
     /*
         Flatten works by selecting a zip of the result tree from the
@@ -113,7 +113,7 @@ async fn execute_flatten<'schema, 'req>(
             JsonSliceValue::from_path_and_value(&flatten_node.path, &response_read_guard.data);
 
         dbg!(slice.clone().into_value());
-        let mut inner_response_write_guard = inner_lock.write().await;
+        let mut inner_response_write_guard = child_lock.write().await;
         *inner_response_write_guard = GraphQLResponse {
             data: slice.into_value(),
             errors: None,
@@ -121,7 +121,7 @@ async fn execute_flatten<'schema, 'req>(
     }
 
     if let PlanNode::Fetch(fetch) = &flatten_node.node.as_ref() {
-        let result = execute_entities_fetch(context, fetch, &inner_lock).await;
+        let result = execute_entities_fetch(context, fetch, &child_lock).await;
         if let Err(_e) = result {
             unimplemented!("Handle error")
         }
@@ -129,7 +129,7 @@ async fn execute_flatten<'schema, 'req>(
         panic!("The node in a Flatten node is always a Fetch node")
     }
 
-    dbg!(&inner_lock.read().await.data);
+    dbg!(&child_lock.read().await.data);
 
     // once the node has been executed, we need to restitch it back to the parent
     // node on the tree of result data
@@ -145,11 +145,11 @@ async fn execute_flatten<'schema, 'req>(
         path = [topProducts, @]
     */
     {
-        let mut response_write_guard = response_lock.write().await;
-        let sliced_response = inner_lock.into_inner();
+        let mut parent_response_guard = response_lock.write().await;
+        let child_response = child_lock.into_inner();
         merge_flattend_responses(
-            &mut *response_write_guard,
-            sliced_response,
+            &mut *parent_response_guard,
+            child_response,
             &flatten_node.path,
         );
     }
@@ -170,53 +170,40 @@ fn merge_flattend_responses(
         }
     }
 
-    fn merge_data(parent_data: &mut Value, child_data: Value, path: &[String]) {
-        dbg!(
-            "------------------------------------------------",
-            &path,
-            &parent_data,
-            &child_data,
-        );
-        if child_data.is_null() {
-            // Nothing to do
-            return;
-        }
+    let mut parent_data = &mut parent_response.data;
+    let child_data = child_response.data;
 
-        // Path is empty, recursion stop condition, merge data.
-        if path.is_empty() {
-            merge2(parent_data, child_data);
-            return;
-        }
+    dbg!(
+        "------------------------------------------------",
+        &path,
+        &parent_data,
+        &child_data,
+    );
 
-        let (current, rest) = path.split_first().expect("path must not be empty here");
-
-        if current != "@" {
-            if let Some(inner) = parent_data.get_mut(current) {
-                merge_data(inner, child_data, rest);
-            }
-            return;
-        }
-
-        // current == "@", multiple ways in which this can go.
-        if let Value::Array(parent_array) = parent_data {
-            if rest.iter().any(|p| p == "@") {
-                // ???
-            } else {
-                if let Value::Array(child_array) = child_data {
-                    let zip = parent_array.iter_mut().zip(child_array.into_iter());
-                    for (parent_item, child_item) in zip {
-                        merge_data(parent_item, child_item, rest)
-                    }
-                } else {
-                    tracing::info!("// TODO(ran) FIXME: child is not array. Good? Bad?")
-                }
-            }
-        } else {
-            todo!("Not sure this is reachable?")
-        }
+    if child_data.is_null() {
+        // Nothing to do
+        return;
     }
 
-    merge_data(&mut parent_response.data, child_response.data, path);
+    let slice = JsonSliceValueMut::new(parent_data).slice_by_path(path);
+
+    let child_data = match child_data {
+        Value::Array(child_data) => child_data,
+        v @ Value::Object(_) => vec![v],
+        _ => unreachable!(
+            "child_response is the result of an entities fetch that returns an array or object"
+        ),
+    };
+
+    for (parent, child) in slice.flatten().into_iter().zip(child_data.into_iter()) {
+        match parent {
+            JsonSliceValueMut::Value(parent) => merge2(parent, child),
+            JsonSliceValueMut::Null => (),
+            JsonSliceValueMut::Array(_) => {
+                unreachable!("the slice has been flattened out of all arrays")
+            }
+        }
+    }
 }
 
 async fn execute_fetch<'schema, 'req>(
@@ -415,5 +402,5 @@ async fn update_variables_with_representations(
     );
 }
 
-// TODO(ran) FIXME: update message on various unreachable!s
+// TODO(ran) FIXME: update message on various unreachable!s, convert to Result
 // TODO(ran) FIXME: replace panics with Error

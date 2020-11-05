@@ -1,5 +1,6 @@
 use serde_json::Value;
 
+// TODO(ran) FIXME: kill this or the other.
 pub(crate) fn merge(target: &mut Value, source: &Value) {
     if source.is_null() {
         return;

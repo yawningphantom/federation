@@ -264,16 +264,17 @@ async fn execute_entities_fetch<'schema, 'req>(
         .await?;
 
     if let Some(recieved_entities) = response_received.data.get("_entities") {
-        let mut entities_to_merge = response_lock.write().await;
-        entities_to_merge.merge_errors(response_received.errors);
-        let data = &mut (*entities_to_merge).data;
+        let mut response_to_update = response_lock.write().await;
+        response_to_update.merge_errors(response_received.errors);
+
+        let entities_to_update = &mut (*response_to_update).data;
         trace!(
             "{{\"merge\": {}, \"into entities\": {}, \"with indexes\": {:?}}}",
             recieved_entities.to_string(),
-            data.to_string(),
+            entities_to_update.to_string(),
             representations_to_entity
         );
-        match data {
+        match entities_to_update {
             Value::Array(entities) => {
                 for (repr_idx, entity_idx) in representations_to_entity.into_iter().enumerate() {
                     if let Some(entity) = entities.get_mut(entity_idx) {
@@ -282,7 +283,7 @@ async fn execute_entities_fetch<'schema, 'req>(
                 }
             }
             Value::Object(_) => {
-                merge(data, &recieved_entities[0]);
+                merge(entities_to_update, &recieved_entities[0]);
             }
             _ => {}
         }
@@ -389,5 +390,4 @@ async fn update_variables_with_representations(
     );
 }
 
-// TODO(ran) FIXME: update message on various unreachable!s, convert to Result
-// TODO(ran) FIXME: replace panics with Error
+// TODO(ran) FIXME: update message on a panic!s, convert to Result

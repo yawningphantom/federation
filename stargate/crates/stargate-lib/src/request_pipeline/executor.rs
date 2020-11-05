@@ -1,7 +1,7 @@
 use crate::request_pipeline::service_definition::{Service, ServiceDefinition};
 use crate::transports::http::{GraphQLResponse, RequestContext};
-use crate::utilities::deep_merge::{merge, merge2};
-use crate::utilities::json::{JsonSliceValue, JsonSliceValueMut};
+use crate::utilities::deep_merge::deep_merge;
+use crate::utilities::json::{slice_and_clone_at_path, JsonSliceValue};
 use crate::Result;
 use apollo_query_planner::model::Selection::Field;
 use apollo_query_planner::model::Selection::InlineFragment;
@@ -105,16 +105,10 @@ async fn execute_flatten<'schema, 'req>(
             { __typename: "Book", isbn: "1234" }
         }
     */
-    let inner_response: RwLock<GraphQLResponse> = {
-        let response_read_guard = response_lock.read().await;
-        let slice =
-            JsonSliceValue::from_path_and_value(&flatten_node.path, &response_read_guard.data);
-
-        RwLock::new(GraphQLResponse {
-            data: slice.into_value(),
-            errors: None,
-        })
-    };
+    let inner_response: RwLock<GraphQLResponse> = RwLock::new(GraphQLResponse {
+        data: slice_and_clone_at_path(&response_lock.read().await.data, &flatten_node.path),
+        errors: None,
+    });
 
     if let PlanNode::Fetch(fetch) = &flatten_node.node.as_ref() {
         let result = execute_entities_fetch(context, fetch, &inner_response).await;
@@ -172,7 +166,7 @@ fn merge_flattend_responses(
         return;
     }
 
-    let slice = JsonSliceValueMut::new(parent_data).slice_by_path(path);
+    let slice = JsonSliceValue::new(parent_data).slice_by_path(path);
 
     let child_data = match child_data {
         Value::Array(child_data) => child_data,
@@ -184,9 +178,9 @@ fn merge_flattend_responses(
 
     for (parent, child) in slice.flatten().into_iter().zip(child_data.into_iter()) {
         match parent {
-            JsonSliceValueMut::Value(parent) => merge2(parent, child),
-            JsonSliceValueMut::Null => (),
-            JsonSliceValueMut::Array(_) => {
+            JsonSliceValue::Value(parent) => deep_merge(parent, child),
+            JsonSliceValue::Null => (),
+            JsonSliceValue::Array(_) => {
                 unreachable!("the slice has been flattened out of all arrays")
             }
         }
@@ -245,50 +239,54 @@ async fn execute_entities_fetch<'schema, 'req>(
         }
     }
 
-    let mut representations_to_entity: Vec<usize> = vec![];
-
     if variables.contains_key("representations") {
         panic!("variables must not contain key named 'represenations'");
     }
 
-    update_variables_with_representations(
-        &mut variables,
-        response_lock,
-        requires,
-        &mut representations_to_entity,
-    )
-    .await;
+    let representations_to_entity =
+        update_variables_with_representations(&mut variables, response_lock, requires).await;
 
     let response_received = service
         .send_operation(context.request_context, fetch.operation.clone(), variables)
         .await?;
 
-    if let Some(recieved_entities) = response_received.data.get("_entities") {
+    let mut response_obj = letp!(Value::Object(r) = response_received.data => r);
+
+    if let Some(Value::Array(mut recieved_entities)) = response_obj.remove("_entities") {
         let mut response_to_update = response_lock.write().await;
         response_to_update.merge_errors(response_received.errors);
 
         let entities_to_update = &mut (*response_to_update).data;
-        trace!(
-            "{{\"merge\": {}, \"into entities\": {}, \"with indexes\": {:?}}}",
-            recieved_entities.to_string(),
-            entities_to_update.to_string(),
-            representations_to_entity
-        );
+
         match entities_to_update {
             Value::Array(entities) => {
+                let mut recieved_entities: HashMap<usize, Value> =
+                    recieved_entities.into_iter().enumerate().collect();
+
                 for (repr_idx, entity_idx) in representations_to_entity.into_iter().enumerate() {
                     if let Some(entity) = entities.get_mut(entity_idx) {
-                        merge(entity, &recieved_entities[repr_idx]);
+                        deep_merge(
+                            entity,
+                            recieved_entities
+                                .remove(&repr_idx)
+                                .expect("entity must exist in this key"),
+                        );
                     }
                 }
             }
             Value::Object(_) => {
-                merge(entities_to_update, &recieved_entities[0]);
+                if recieved_entities.len() != 1 {
+                    unreachable!("_entities must only have 1 element when merging to an object.")
+                }
+                deep_merge(
+                    entities_to_update,
+                    recieved_entities.pop().expect("verified length is 1"),
+                );
             }
             _ => {}
         }
     } else {
-        panic!("Expected data._entities to contain elements");
+        panic!("Expected data._entities to contain an array");
     }
 
     Ok(())
@@ -339,9 +337,9 @@ fn execute_selection_set(entity: &Value, requires: &SelectionSet) -> Value {
                     if let Some(typename) = entity.get("__typename") {
                         let typename = typename.as_str().expect("__typename's type must be String");
                         if typename == type_condition {
-                            merge(
+                            deep_merge(
                                 &mut result,
-                                &execute_selection_set(entity, &fragment.selections),
+                                execute_selection_set(entity, &fragment.selections),
                             );
                         }
                     }
@@ -357,8 +355,9 @@ async fn update_variables_with_representations(
     variables: &mut HashMap<String, Value>,
     response: &RwLock<GraphQLResponse>,
     requires: &SelectionSet,
-    representations_to_entity: &mut Vec<usize>,
-) {
+) -> Vec<usize> {
+    let mut representations_to_entity: Vec<usize> = vec![];
+
     let mut representations: Vec<Value> = vec![];
 
     let mut update_with_entity = |idx: usize, entity: &Value| {
@@ -388,6 +387,8 @@ async fn update_variables_with_representations(
         String::from("representations"),
         Value::Array(representations),
     );
+
+    representations_to_entity
 }
 
 // TODO(ran) FIXME: update message on a panic!s, convert to Result

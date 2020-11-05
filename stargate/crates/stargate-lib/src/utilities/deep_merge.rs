@@ -1,44 +1,7 @@
 use serde_json::Value;
 
-// TODO(ran) FIXME: kill this or the other.
-pub(crate) fn merge(target: &mut Value, source: &Value) {
-    if source.is_null() {
-        return;
-    }
-
-    match (target, source) {
-        (&mut Value::Object(ref mut map), &Value::Object(ref source)) => {
-            for (key, source_value) in source {
-                let target_value = map.entry(key.as_str()).or_insert_with(|| Value::Null);
-
-                if !target_value.is_null() && (source_value.is_object() || source_value.is_array())
-                {
-                    merge(target_value, source_value);
-                } else {
-                    *target_value = source_value.clone();
-                }
-            }
-        }
-        (&mut Value::Array(ref mut array), &Value::Array(ref source)) => {
-            for (index, source_value) in source.iter().enumerate() {
-                if let Some(target_value) = array.get_mut(index) {
-                    if !target_value.is_null() && source_value.is_object() {
-                        merge(target_value, source_value);
-                    } else {
-                        *target_value = source_value.clone();
-                    }
-                } else {
-                    array.push(source_value.clone());
-                }
-            }
-        }
-        (a, b) => {
-            *a = b.clone();
-        }
-    }
-}
-
-pub(crate) fn merge2(target: &mut Value, source: Value) {
+// TODO(ran) FIXME: move to json
+pub(crate) fn deep_merge(target: &mut Value, source: Value) {
     if source.is_null() {
         return;
     }
@@ -55,7 +18,7 @@ pub(crate) fn merge2(target: &mut Value, source: Value) {
                 let target_value = map.entry(key.as_str()).or_insert_with(|| Value::Null);
                 if !target_value.is_null() && (source_value.is_object() || source_value.is_array())
                 {
-                    merge2(target_value, source_value);
+                    deep_merge(target_value, source_value);
                 } else {
                     *target_value = source_value;
                 }
@@ -67,17 +30,17 @@ pub(crate) fn merge2(target: &mut Value, source: Value) {
             let target_len = target.len();
             if source_len == target_len {
                 for (src, target) in source.into_iter().zip(target) {
-                    merge2(target, src)
+                    deep_merge(target, src)
                 }
             } else if source_len > target_len {
                 let rest = source.split_off(target.len());
                 for (src, target) in source.into_iter().zip(target.iter_mut()) {
-                    merge2(target, src)
+                    deep_merge(target, src)
                 }
                 target.extend(rest)
             } else {
                 for (target, src) in target.iter_mut().zip(source) {
-                    merge2(target, src)
+                    deep_merge(target, src)
                 }
             }
         }
@@ -97,7 +60,7 @@ mod tests {
         let mut first: Value = json!({"value1":"a","value2":"b"});
         let second: Value = json!({"value1":"a","value2":"c","value3":"d"});
 
-        merge(&mut first, &second);
+        deep_merge(&mut first, second);
 
         assert_eq!(
             r#"{"value1":"a","value2":"c","value3":"d"}"#,
@@ -109,7 +72,7 @@ mod tests {
         let mut first: Value = json!([{"value":"a","value2":"a+"},{"value":"b"}]);
         let second: Value = json!([{"value":"b"},{"value":"c"}]);
 
-        merge(&mut first, &second);
+        deep_merge(&mut first, second);
         assert_eq!(
             r#"[{"value":"b","value2":"a+"},{"value":"c"}]"#,
             first.to_string()
@@ -120,7 +83,7 @@ mod tests {
         let mut first: Value = json!({"a":1,"b":{"someProperty":1,"overwrittenProperty":"clean"}});
         let second: Value = json!({"b":{"overwrittenProperty":"dirty","newProperty":"new"},"c":4});
 
-        merge(&mut first, &second);
+        deep_merge(&mut first, second);
 
         assert_eq!(
             json!({"a":1,"b":{"someProperty":1,"overwrittenProperty":"dirty","newProperty":"new"},"c":4}),
@@ -133,7 +96,7 @@ mod tests {
 
         let second: Value = json!({"e":2,"b":[{"f":3}]});
 
-        merge(&mut first, &second);
+        deep_merge(&mut first, second);
 
         assert_eq!(
             r#"{"a":1,"b":[{"c":1,"d":2,"f":3}],"e":2}"#,

@@ -1,4 +1,4 @@
-use crate::utilities::deep_merge::merge2;
+use crate::utilities::deep_merge::deep_merge;
 use crate::Stargate;
 use http::{HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
@@ -28,7 +28,7 @@ impl GraphQLResponse {
     }
 
     pub fn merge_data(&mut self, data: Value) {
-        merge2(&mut self.data, data)
+        deep_merge(&mut self.data, data)
     }
 
     pub fn merge_errors(&mut self, errors: Option<Vec<GraphQLError>>) {

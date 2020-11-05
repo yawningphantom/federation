@@ -218,8 +218,8 @@ type User
   """A globally unique id for the user"""
   id: ID!
 
-  """The formatted date a user was created in our system"""
-  created: String
+#  """The formatted date a user was created in our system"""
+#  created: String
 
   """The users full name as provided"""
   name: String

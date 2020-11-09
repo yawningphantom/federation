@@ -45,7 +45,7 @@ export function MatchingEnums(context: SDLValidationContext): ASTVisitor {
     if (definitions.every(isEnumDefinition)) {
       // a simple list of services to enum values for a given enum
       // [{ serviceName: "serviceA", values: ["FURNITURE", "BOOK"] }]
-      let simpleEnumDefs: Array<{ serviceName: string; values: string[], nodes: readonly EnumValueDefinitionNode[]}> = [];
+      let simpleEnumDefs: Array<{ serviceName: string; values: string[]}> = [];
 
       // build the simpleEnumDefs list
       for (const {
@@ -57,8 +57,7 @@ export function MatchingEnums(context: SDLValidationContext): ASTVisitor {
             serviceName,
             values: values.map(
               (enumValue: EnumValueDefinitionNode) => enumValue.name.value,
-            ),
-            nodes: values
+            )
           });
       }
 
@@ -69,16 +68,15 @@ export function MatchingEnums(context: SDLValidationContext): ASTVisitor {
 
       // groups of services with matching values, keyed by enum values
       // like {"FURNITURE,BOOK": ["ServiceA", "ServiceB"], "FURNITURE,DIGITAL": ["serviceC"]}
-      let matchingEnumGroups: { [values: string]: {serviceName: string, nodes: readonly EnumValueDefinitionNode[] }[]} = {};
+      let matchingEnumGroups: { [values: string]: string[]} = {};
 
       // build matchingEnumDefs
       for (const definition of simpleEnumDefs) {
         const key = definition.values.join();
-        const serviceWithNodes  = {serviceName: definition.serviceName, nodes: definition.nodes };
         if (matchingEnumGroups[key]) {
-          matchingEnumGroups[key].push(serviceWithNodes);
+          matchingEnumGroups[key].push(definition.serviceName);
         } else {
-          matchingEnumGroups[key] = [serviceWithNodes];
+          matchingEnumGroups[key] = [definition.serviceName];
         }
       }
 

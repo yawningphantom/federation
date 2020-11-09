@@ -85,6 +85,7 @@ export const keyFieldsMissingExternal = ({
               errors.push(
                 errorWithCode(
                   'KEY_FIELDS_MISSING_EXTERNAL',
+                  {[serviceName]:parentType.astNode},
                   logServiceAndType(serviceName, parentType.name) +
                     `A @key directive specifies a field which is not found in this service. Add a field to this type with @external.`,
                 ),
@@ -100,6 +101,7 @@ export const keyFieldsMissingExternal = ({
               errors.push(
                 errorWithCode(
                   'KEY_FIELDS_MISSING_EXTERNAL',
+                  {[serviceName]:parentType.astNode},
                   logServiceAndType(serviceName, parentType.name) +
                     `A @key directive specifies the \`${fieldDef.name}\` field which has no matching @external field.`,
                 ),

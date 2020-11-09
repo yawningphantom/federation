@@ -34,6 +34,7 @@ export const reservedFieldUsed = ({
             errors.push(
               errorWithCode(
                 'RESERVED_FIELD_USED',
+                {[serviceName]:field},
                 logServiceAndType(serviceName, rootQueryName, fieldName) +
                   `${fieldName} is a field reserved for federation and can\'t be used at the Query root.`,
               ),

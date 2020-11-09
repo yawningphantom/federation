@@ -220,6 +220,7 @@ export const externalUnused: PostCompositionValidator = ({ schema }) => {
           errors.push(
             errorWithCode(
               'EXTERNAL_UNUSED',
+              {[serviceName]: externalField},
               logServiceAndType(
                 serviceName,
                 parentTypeName,

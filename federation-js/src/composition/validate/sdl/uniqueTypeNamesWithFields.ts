@@ -74,6 +74,7 @@ export function UniqueTypeNamesWithFields(
         context.reportError(
           errorWithCode(
             'VALUE_TYPE_KIND_MISMATCH',
+            {[duplicateTypeNode.serviceName as string]: [node, duplicateTypeNode]},
             `${logServiceAndType(
               duplicateTypeNode.serviceName!,
               typeName,
@@ -86,7 +87,7 @@ export function UniqueTypeNamesWithFields(
             }\` and a \`${
               kind[1]
             }\`. In order to define \`${typeName}\` in multiple places, the kinds must be identical.`,
-            [node, duplicateTypeNode],
+            // [node, duplicateTypeNode],
           ),
         );
         return;
@@ -102,6 +103,7 @@ export function UniqueTypeNamesWithFields(
             possibleErrors.push(
               errorWithCode(
                 'VALUE_TYPE_FIELD_TYPE_MISMATCH',
+                {[duplicateTypeNode.serviceName as string]: [node, duplicateTypeNode]},
                 `${logServiceAndType(
                   duplicateTypeNode.serviceName!,
                   typeName,
@@ -113,7 +115,7 @@ export function UniqueTypeNamesWithFields(
                 }\` define \`${typeName}.${fieldName}\` as a ${types[1]} and ${
                   types[0]
                 } respectively. In order to define \`${typeName}\` in multiple places, the fields and their types must be identical.`,
-                [node, duplicateTypeNode],
+                // [node, duplicateTypeNode],
               ),
             );
             return true;
@@ -136,11 +138,12 @@ export function UniqueTypeNamesWithFields(
           context.reportError(
             errorWithCode(
               'VALUE_TYPE_NO_ENTITY',
+              {[duplicateTypeNode.serviceName as string]: [node, duplicateTypeNode]},
               `${logServiceAndType(
                 entityNode.serviceName!,
                 typeName,
               )}Value types cannot be entities (using the \`@key\` directive). Please ensure that the \`${typeName}\` type is extended properly or remove the \`@key\` directive if this is not an entity.`,
-              [node, duplicateTypeNode],
+              // [node, duplicateTypeNode],
             ),
           );
         }

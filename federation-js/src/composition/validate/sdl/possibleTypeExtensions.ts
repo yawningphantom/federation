@@ -56,6 +56,7 @@ export function PossibleTypeExtensions(
         context.reportError(
           errorWithCode(
             'EXTENSION_OF_WRONG_KIND',
+            {[serviceName]: node},
             logServiceAndType(serviceName, typeName) +
               `\`${typeName}\` was originally defined as a ${baseKind} and can only be extended by a ${expectedKind}. ${serviceName} defines ${typeName} as a ${node.kind}`,
           ),
@@ -68,6 +69,7 @@ export function PossibleTypeExtensions(
         context.reportError(
           errorWithCode(
             'EXTENSION_OF_WRONG_KIND',
+            {[serviceName]: node},
             logServiceAndType(serviceName, typeName) +
               `\`${typeName}\` was originally defined as a ${baseKind} and can only be extended by a ${expectedKind}. ${serviceName} defines ${typeName} as a ${node.kind}`,
           ),
@@ -77,6 +79,7 @@ export function PossibleTypeExtensions(
       context.reportError(
         errorWithCode(
           'EXTENSION_WITH_NO_BASE',
+          {[serviceName]: node},
           logServiceAndType(serviceName, typeName) +
             `\`${typeName}\` is an extension type, but \`${typeName}\` is not defined in any service`,
         ),

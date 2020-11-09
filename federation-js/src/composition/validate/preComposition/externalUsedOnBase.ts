@@ -23,6 +23,7 @@ export const externalUsedOnBase = ({
                 errors.push(
                   errorWithCode(
                     'EXTERNAL_USED_ON_BASE',
+                    {[serviceName]:field},
                     logServiceAndType(
                       serviceName,
                       typeDefinition.name.value,

@@ -40,6 +40,7 @@ export const externalTypeMismatch: PostCompositionValidator = ({ schema }) => {
             errors.push(
               errorWithCode(
                 'EXTERNAL_TYPE_MISMATCH',
+                {[serviceName]: externalField},
                 logServiceAndType(serviceName, typeName, externalFieldName) +
                   `the type of the @external field does not exist in the resulting composed schema`,
               ),
@@ -51,6 +52,7 @@ export const externalTypeMismatch: PostCompositionValidator = ({ schema }) => {
             errors.push(
               errorWithCode(
                 'EXTERNAL_TYPE_MISMATCH',
+                {[serviceName]: externalField},
                 logServiceAndType(serviceName, typeName, externalFieldName) +
                   `Type \`${externalFieldType}\` does not match the type of the original field in ${typeFederationMetadata.serviceName} (\`${matchingBaseField.type}\`)`,
               ),

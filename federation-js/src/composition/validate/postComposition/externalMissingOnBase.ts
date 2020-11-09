@@ -14,6 +14,7 @@ export const externalMissingOnBase: PostCompositionValidator = ({ schema }) => {
     // Only object types have fields
     if (!isObjectType(namedType)) continue;
 
+
     const typeFederationMetadata = getFederationMetadata(namedType);
 
     // If externals is populated, we need to look at each one and confirm
@@ -34,6 +35,7 @@ export const externalMissingOnBase: PostCompositionValidator = ({ schema }) => {
             errors.push(
               errorWithCode(
                 'EXTERNAL_MISSING_ON_BASE',
+                {[serviceName]:externalField},
                 logServiceAndType(serviceName, typeName, externalFieldName) +
                   `marked @external but ${externalFieldName} is not defined on the base service of ${typeName} (${typeFederationMetadata.serviceName})`,
               ),
@@ -49,6 +51,7 @@ export const externalMissingOnBase: PostCompositionValidator = ({ schema }) => {
             errors.push(
               errorWithCode(
                 'EXTERNAL_MISSING_ON_BASE',
+                {[fieldFederationMetadata?.serviceName]: externalField},
                 logServiceAndType(serviceName, typeName, externalFieldName) +
                   `marked @external but ${externalFieldName} was defined in ${fieldFederationMetadata.serviceName}, not in the service that owns ${typeName} (${typeFederationMetadata.serviceName})`,
               ),

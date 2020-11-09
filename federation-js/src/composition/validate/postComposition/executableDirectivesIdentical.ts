@@ -8,6 +8,7 @@ import {
   getFederationMetadata,
 } from '../../utils';
 import { PostCompositionValidator } from '.';
+import { ImpactedServicesCompositionError } from '@apollo/federation/src/composition/types';
 
 /**
  * A custom directive must be defined identically across all services. This means
@@ -43,9 +44,13 @@ export const executableDirectivesIdentical: PostCompositionValidator = ({
     });
 
     if (shouldError) {
+      let impactedServices: ImpactedServicesCompositionError = {};
+      definitions.map(([serviceName, definition])=>impactedServices[serviceName] = definition);
+
       errors.push(
         errorWithCode(
           'EXECUTABLE_DIRECTIVES_IDENTICAL',
+          impactedServices,
           logDirective(directive.name) +
             `custom directives must be defined identically across all services. See below for a list of current implementations:\n${definitions
               .map(([serviceName, definition]) => {

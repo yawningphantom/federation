@@ -23,6 +23,7 @@ export const requiresUsedOnBase = ({
                 errors.push(
                   errorWithCode(
                     'REQUIRES_USED_ON_BASE',
+                    {[serviceName]:field},
                     logServiceAndType(
                       serviceName,
                       typeDefinition.name.value,

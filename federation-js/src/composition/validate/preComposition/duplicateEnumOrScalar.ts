@@ -20,6 +20,7 @@ export const duplicateEnumOrScalar = ({
         errors.push(
           errorWithCode(
             'DUPLICATE_ENUM_DEFINITION',
+            {[serviceName]:definition},
             logServiceAndType(serviceName, name) +
               `The enum, \`${name}\` was defined multiple times in this service. Remove one of the definitions for \`${name}\``,
           ),
@@ -35,6 +36,7 @@ export const duplicateEnumOrScalar = ({
         errors.push(
           errorWithCode(
             'DUPLICATE_SCALAR_DEFINITION',
+            {[serviceName]:definition},
             logServiceAndType(serviceName, name) +
               `The scalar, \`${name}\` was defined multiple times in this service. Remove one of the definitions for \`${name}\``,
           ),

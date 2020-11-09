@@ -50,6 +50,7 @@ export const providesFieldsSelectInvalidType: PostCompositionValidator = ({
             errors.push(
               errorWithCode(
                 'PROVIDES_FIELDS_SELECT_INVALID_TYPE',
+                {[serviceName]: selection},
                 logServiceAndType(serviceName, typeName, fieldName) +
                   `A @provides selects ${name}, but ${fieldType.name}.${name} could not be found`,
               ),
@@ -65,6 +66,7 @@ export const providesFieldsSelectInvalidType: PostCompositionValidator = ({
             errors.push(
               errorWithCode(
                 'PROVIDES_FIELDS_SELECT_INVALID_TYPE',
+                {[serviceName]: selection},
                 logServiceAndType(serviceName, typeName, fieldName) +
                   `A @provides selects ${fieldType.name}.${name}, which is a list type. A field cannot @provide lists.`,
               ),
@@ -78,6 +80,7 @@ export const providesFieldsSelectInvalidType: PostCompositionValidator = ({
             errors.push(
               errorWithCode(
                 'PROVIDES_FIELDS_SELECT_INVALID_TYPE',
+                {[serviceName]: selection},
                 logServiceAndType(serviceName, typeName, fieldName) +
                   `A @provides selects ${fieldType.name}.${name}, which is an interface type. A field cannot @provide interfaces.`,
               ),
@@ -92,6 +95,7 @@ export const providesFieldsSelectInvalidType: PostCompositionValidator = ({
             errors.push(
               errorWithCode(
                 'PROVIDES_FIELDS_SELECT_INVALID_TYPE',
+                {[serviceName]: selection},
                 logServiceAndType(serviceName, typeName, fieldName) +
                   `A @provides selects ${fieldType.name}.${name}, which is a union type. A field cannot @provide union types.`,
               ),

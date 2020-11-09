@@ -26,12 +26,11 @@ import {
   TypeExtensionNode,
   BREAK,
   print,
-  ASTNode,
   DirectiveDefinitionNode,
   GraphQLDirective,
   OperationTypeNode,
   isDirective,
-  isNamedType,
+  isNamedType
 } from 'graphql';
 import {
   ExternalFieldDefinition,
@@ -40,6 +39,7 @@ import {
   FederationType,
   FederationDirective,
   FederationField,
+  ImpactedServicesCompositionError,
 } from './types';
 import federationDirectives from '../directives';
 
@@ -197,18 +197,19 @@ export function logDirective(directiveName: string) {
 // TODO: allow passing of the other args here, rather than just message and code
 export function errorWithCode(
   code: string,
-  message: string,
-  nodes?: ReadonlyArray<ASTNode> | ASTNode | undefined,
+  impactedServices: ImpactedServicesCompositionError,
+  message: string
 ) {
   return new GraphQLError(
     message,
-    nodes,
+    undefined,
     undefined,
     undefined,
     undefined,
     undefined,
     {
       code,
+      impactedServices
     },
   );
 }

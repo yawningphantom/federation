@@ -46,6 +46,7 @@ export function UniqueUnionTypes(context: SDLValidationContext): ASTVisitor {
         context.reportError(
           errorWithCode(
             'VALUE_TYPE_UNION_TYPES_MISMATCH',
+            {[duplicateTypeNode.serviceName as string]: [node, duplicateTypeNode]},
             `${logServiceAndType(
               duplicateTypeNode.serviceName!,
               typeName,
@@ -58,7 +59,7 @@ export function UniqueUnionTypes(context: SDLValidationContext): ASTVisitor {
             } ${unionDiff.map(diffEntry => diffEntry.name.value).join(', ')} ${
               diffLength > 1 ? 'are' : 'is'
             } mismatched.`,
-            [node, duplicateTypeNode],
+            // [node, duplicateTypeNode],
           ),
         );
       }

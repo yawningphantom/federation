@@ -40,6 +40,7 @@ export const keyFieldsSelectInvalidType: PostCompositionValidator = ({
               errors.push(
                 errorWithCode(
                   'KEY_FIELDS_SELECT_INVALID_TYPE',
+                  {[serviceName]:field},
                   logServiceAndType(serviceName, typeName) +
                     `A @key selects ${name}, but ${typeName}.${name} could not be found`,
                 ),
@@ -55,6 +56,7 @@ export const keyFieldsSelectInvalidType: PostCompositionValidator = ({
                 errors.push(
                   errorWithCode(
                     'KEY_FIELDS_SELECT_INVALID_TYPE',
+                    {[serviceName]:field},
                     logServiceAndType(serviceName, typeName) +
                       `A @key selects ${typeName}.${name}, which is an interface type. Keys cannot select interfaces.`,
                   ),
@@ -69,6 +71,7 @@ export const keyFieldsSelectInvalidType: PostCompositionValidator = ({
                 errors.push(
                   errorWithCode(
                     'KEY_FIELDS_SELECT_INVALID_TYPE',
+                    {[serviceName]:field},
                     logServiceAndType(serviceName, typeName) +
                       `A @key selects ${typeName}.${name}, which is a union type. Keys cannot select union types.`,
                   ),

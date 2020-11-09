@@ -43,6 +43,7 @@ export const requiresFieldsMissingExternal: PostCompositionValidator = ({
             errors.push(
               errorWithCode(
                 'REQUIRES_FIELDS_MISSING_EXTERNAL',
+                {[serviceName]: field.astNode},
                 logServiceAndType(serviceName, typeName, fieldName) +
                   `requires the field \`${selection.name.value}\` to be marked as @external.`,
               ),

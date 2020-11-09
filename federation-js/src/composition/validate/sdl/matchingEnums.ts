@@ -8,6 +8,7 @@ import {
 } from 'graphql';
 import { errorWithCode, logServiceAndType } from '../../utils';
 import { isString } from 'util';
+import { ImpactedServicesCompositionError } from '@apollo/federation/src/composition/types';
 
 function isEnumDefinition(node: TypeDefinitionNode) {
   return node.kind === Kind.ENUM_TYPE_DEFINITION;
@@ -44,7 +45,7 @@ export function MatchingEnums(context: SDLValidationContext): ASTVisitor {
     if (definitions.every(isEnumDefinition)) {
       // a simple list of services to enum values for a given enum
       // [{ serviceName: "serviceA", values: ["FURNITURE", "BOOK"] }]
-      let simpleEnumDefs: Array<{ serviceName: string; values: string[] }> = [];
+      let simpleEnumDefs: Array<{ serviceName: string; values: string[], nodes: readonly EnumValueDefinitionNode[]}> = [];
 
       // build the simpleEnumDefs list
       for (const {
@@ -57,6 +58,7 @@ export function MatchingEnums(context: SDLValidationContext): ASTVisitor {
             values: values.map(
               (enumValue: EnumValueDefinitionNode) => enumValue.name.value,
             ),
+            nodes: values
           });
       }
 
@@ -67,22 +69,27 @@ export function MatchingEnums(context: SDLValidationContext): ASTVisitor {
 
       // groups of services with matching values, keyed by enum values
       // like {"FURNITURE,BOOK": ["ServiceA", "ServiceB"], "FURNITURE,DIGITAL": ["serviceC"]}
-      let matchingEnumGroups: { [values: string]: string[] } = {};
+      let matchingEnumGroups: { [values: string]: {serviceName: string, nodes: readonly EnumValueDefinitionNode[] }[]} = {};
 
       // build matchingEnumDefs
       for (const definition of simpleEnumDefs) {
         const key = definition.values.join();
+        const serviceWithNodes  = {serviceName: definition.serviceName, nodes: definition.nodes };
         if (matchingEnumGroups[key]) {
-          matchingEnumGroups[key].push(definition.serviceName);
+          matchingEnumGroups[key].push(serviceWithNodes);
         } else {
-          matchingEnumGroups[key] = [definition.serviceName];
+          matchingEnumGroups[key] = [serviceWithNodes];
         }
       }
 
       if (Object.keys(matchingEnumGroups).length > 1) {
+        let impactedServices: ImpactedServicesCompositionError = {};
+        // Object.values(matchingEnumGroups).map(serviceNames => serviceNames.map(serviceName=> impactedServices[serviceName] = null));
+
         context.reportError(
           errorWithCode(
             'ENUM_MISMATCH',
+            impactedServices,
             `The \`${name}\` enum does not have identical values in all services. Groups of services with identical values are: ${Object.values(
               matchingEnumGroups,
             )
@@ -92,6 +99,7 @@ export function MatchingEnums(context: SDLValidationContext): ASTVisitor {
         );
       }
     } else if (definitions.some(isEnumDefinition)) {
+      let impactedServices: ImpactedServicesCompositionError = {};
       // if only SOME definitions in the list are enums, we need to error
 
       // first, find the services, where the defs ARE enums
@@ -109,6 +117,7 @@ export function MatchingEnums(context: SDLValidationContext): ASTVisitor {
       context.reportError(
         errorWithCode(
           'ENUM_MISMATCH_TYPE',
+          impactedServices,
           logServiceAndType(servicesWithEnum[0], name) +
             `${name} is an enum in [${servicesWithEnum.join(
               ', ',

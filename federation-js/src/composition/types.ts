@@ -3,6 +3,7 @@ import {
   DocumentNode,
   FieldDefinitionNode,
   DirectiveDefinitionNode,
+  ASTNode,
 } from 'graphql';
 
 export type Maybe<T> = null | undefined | T;
@@ -50,6 +51,10 @@ export interface ServiceDefinition {
   typeDefs: DocumentNode;
   name: string;
   url?: string;
+}
+
+export interface ImpactedServicesCompositionError {
+  [serviceName: string] : ReadonlyArray<ASTNode> | ASTNode | undefined | null
 }
 
 declare module 'graphql/language/ast' {

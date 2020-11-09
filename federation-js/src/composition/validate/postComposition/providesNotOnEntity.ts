@@ -50,6 +50,7 @@ export const providesNotOnEntity: PostCompositionValidator = ({ schema }) => {
           errors.push(
             errorWithCode(
               'PROVIDES_NOT_ON_ENTITY',
+              {[serviceName]: field.astNode},
               logServiceAndType(serviceName, typeName, fieldName) +
                 `uses the @provides directive but \`${typeName}.${fieldName}\` returns \`${field.type}\`, which is not an Object or List type. @provides can only be used on Object types with at least one @key, or Lists of such Objects.`,
             ),
@@ -64,6 +65,7 @@ export const providesNotOnEntity: PostCompositionValidator = ({ schema }) => {
           errors.push(
             errorWithCode(
               'PROVIDES_NOT_ON_ENTITY',
+              {[serviceName]: field.astNode},
               logServiceAndType(serviceName, typeName, fieldName) +
                 `uses the @provides directive but \`${typeName}.${fieldName}\` does not return a type that has a @key. Try adding a @key to the \`${baseType}\` type.`,
             ),

@@ -25,6 +25,7 @@ export const duplicateEnumValue = ({
             errors.push(
               errorWithCode(
                 'DUPLICATE_ENUM_VALUE',
+                {[serviceName]:definition},
                 logServiceAndType(serviceName, name, valueName) +
                   `The enum, \`${name}\` has multiple definitions of the \`${valueName}\` value.`,
               ),
@@ -52,6 +53,7 @@ export const duplicateEnumValue = ({
             errors.push(
               errorWithCode(
                 'DUPLICATE_ENUM_VALUE',
+                {[serviceName]:definition},
                 logServiceAndType(serviceName, name, valueName) +
                   `The enum, \`${name}\` has multiple definitions of the \`${valueName}\` value.`,
               ),

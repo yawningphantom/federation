@@ -7,6 +7,7 @@ import {
   getFederationMetadata,
 } from '../../utils';
 import { PostCompositionValidator } from '.';
+import { ImpactedServicesCompositionError } from '@apollo/federation/src/composition/types';
 /**
  * All custom directives with executable locations must be implemented in every
  * service. This validator is not responsible for ensuring the directives are an
@@ -18,6 +19,7 @@ export const executableDirectivesInAllServices: PostCompositionValidator = ({
   serviceList,
 }) => {
   const errors: GraphQLError[] = [];
+  let impactedServices: ImpactedServicesCompositionError = {};
 
   const customExecutableDirectives = schema
     .getDirectives()
@@ -37,6 +39,7 @@ export const executableDirectivesInAllServices: PostCompositionValidator = ({
       (without, serviceName) => {
         if (!serviceNamesWithDirective.includes(serviceName)) {
           without.push(serviceName);
+          impactedServices[serviceName] = null;
         }
         return without;
       },
@@ -47,6 +50,7 @@ export const executableDirectivesInAllServices: PostCompositionValidator = ({
       errors.push(
         errorWithCode(
           'EXECUTABLE_DIRECTIVES_IN_ALL_SERVICES',
+          impactedServices,
           logDirective(directive.name) +
             `Custom directives must be implemented in every service. The following services do not implement the @${
               directive.name

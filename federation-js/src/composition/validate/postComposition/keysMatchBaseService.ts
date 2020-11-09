@@ -31,6 +31,7 @@ export const keysMatchBaseService: PostCompositionValidator = function ({
           errors.push(
             errorWithCode(
               'KEY_MISSING_ON_BASE',
+              {[serviceName]: null},
               logServiceAndType(serviceName, parentTypeName) +
                 `appears to be an entity but no @key directives are specified on the originating type.`,
             ),
@@ -48,6 +49,7 @@ export const keysMatchBaseService: PostCompositionValidator = function ({
               errors.push(
                 errorWithCode(
                   'MULTIPLE_KEYS_ON_EXTENSION',
+                  {[extendingService]: null},
                   logServiceAndType(extendingService, parentTypeName) +
                     `is extended from service ${serviceName} but specifies multiple @key directives. Extensions may only specify one @key.`,
                 ),
@@ -64,6 +66,7 @@ export const keysMatchBaseService: PostCompositionValidator = function ({
               errors.push(
                 errorWithCode(
                   'KEY_NOT_SPECIFIED',
+                  {[extendingService]: null},
                   logServiceAndType(extendingService, parentTypeName) +
                     `extends from ${serviceName} but specifies an invalid @key directive. Valid @key directives are specified by the originating type. Available @key directives for this type are:\n` +
                     `\t${availableKeys

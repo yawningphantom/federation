@@ -4,9 +4,10 @@ extern crate lazy_static;
 #[macro_use]
 extern crate derive_builder;
 
-use crate::builder::build_query_plan;
-use crate::model::QueryPlan;
+use builder::build_query_plan;
+use error::QueryPlanError;
 use graphql_parser::{parse_query, parse_schema, schema, ParseError};
+use model::QueryPlan;
 use serde::{Deserialize, Serialize};
 
 #[macro_use]
@@ -15,20 +16,14 @@ mod autofrag;
 mod builder;
 mod consts;
 mod context;
+mod error;
 mod federation;
 mod groups;
 pub mod helpers;
 pub mod model;
 mod visitors;
 
-#[derive(Debug)]
-pub enum QueryPlanError {
-    FailedParsingSchema(ParseError),
-    FailedParsingQuery(ParseError),
-    InvalidQuery(&'static str),
-}
-
-pub type Result<T> = std::result::Result<T, QueryPlanError>;
+pub type Result<T> = std::result::Result<T, error::QueryPlanError>;
 
 #[derive(Debug)]
 pub struct QueryPlanner<'s> {

@@ -13,6 +13,7 @@ use crate::model::Selection as ModelSelection;
 use crate::model::SelectionSet as ModelSelectionSet;
 use crate::model::{FetchNode, FlattenNode, GraphQLDocument, PlanNode, QueryPlan, ResponsePath};
 use crate::{context, model, QueryPlanError, QueryPlanningOptions, Result};
+use anyhow::{Error, Result as AnyhowResult};
 use graphql_parser::query::refs::{FieldRef, InlineFragmentRef, SelectionRef, SelectionSetRef};
 use graphql_parser::query::*;
 use graphql_parser::schema::TypeDefinition;
@@ -35,15 +36,11 @@ pub(crate) fn build_query_plan(
     }
 
     if ops.len() > 1 {
-        return Err(QueryPlanError::InvalidQuery(
-            "multiple operations are not supported",
-        ));
+        return Err(QueryPlanError::InvalidQueryMultipleOperations);
     }
 
     if let Operation::Subscription = ops[0].kind {
-        return Err(QueryPlanError::InvalidQuery(
-            "subscriptions are not supported",
-        ));
+        return Err(QueryPlanError::InvalidQuerySubscriptions);
     }
 
     let types = names_to_types(schema);
@@ -51,7 +48,7 @@ pub(crate) fn build_query_plan(
     // TODO(ran)(p2)(#114) see if we can optimize and memoize the stuff we build only using the schema.
     let context = QueryPlanningContext {
         schema,
-        operation: ops.pop().unwrap(),
+        operation: ops.pop()?,
         fragments: query
             .definitions
             .iter()
@@ -282,7 +279,7 @@ fn split_fields<'a, 'q: 'a>(
                     group,
                     path.clone(),
                     fields_for_parent_type,
-                )
+                )?
             } else {
                 let has_no_extending_field_defs = scope
                     .possible_types
@@ -303,7 +300,7 @@ fn split_fields<'a, 'q: 'a>(
                         group,
                         path.clone(),
                         fields_for_parent_type,
-                    );
+                    )?;
                     continue;
                 }
 
@@ -330,7 +327,7 @@ fn split_fields<'a, 'q: 'a>(
                         group,
                         path.clone(),
                         fields_with_runtime_parent_type,
-                    );
+                    )?;
                 }
             }
         }
@@ -352,23 +349,31 @@ pub(crate) fn get_field_def_from_type<'q>(
     }
 }
 
+fn return_type_not_composite_type(return_type: Option<&&TypeDefinition>) -> AnyhowResult<bool> {
+    Ok(!return_type?.is_composite_type())
+}
+
 fn complete_field<'a, 'q: 'a>(
     context: &'q QueryPlanningContext<'q>,
     scope: Rc<Scope<'q>>,
     parent_group: &'a mut FetchGroup<'q>,
     path: ResponsePath,
     fields: FieldSet<'q>,
-) {
+) -> AnyhowResult<()> {
     let field: context::Field = {
         let type_name = fields[0].field_def.field_type.as_name();
         // the type_name could be a primitive type which is not in our names_to_types map.
         let return_type = context.names_to_types.get(type_name);
 
-        if return_type.is_none() || !return_type.unwrap().is_composite_type() {
+        if return_type.is_none() || return_type_not_composite_type(return_type)? {
             let mut fields = fields;
+            let field = match fields.pop() {
+                Some(field) => Ok(field),
+                None => Err(anyhow!("Expected a field where there was none")),
+            };
             context::Field {
                 scope,
-                ..fields.pop().unwrap()
+                ..fields.pop()?
             }
         } else {
             let return_type = return_type.expect("Already checked this is not None");
@@ -465,7 +470,7 @@ fn split_sub_fields<'q>(
 ) -> FetchGroup<'q> {
     let mut grouper = GroupForSubField::new(context, parent_group);
     split_fields(context, field_path, sub_fields, &mut grouper);
-    grouper.into_groups().pop().unwrap()
+    grouper.into_groups().pop()?
 }
 
 fn execution_node_for_group(
@@ -576,8 +581,7 @@ fn selection_set_from_field_set<'q>(
             let name = fields_with_same_reponse_name[0]
                 .field_def
                 .field_type
-                .name()
-                .unwrap();
+                .name()?;
 
             // NB: we don't have specified types (i.e. primitives) in our map.
             // They are not composite types.
@@ -589,11 +593,7 @@ fn selection_set_from_field_set<'q>(
         };
 
         if !is_composite_type || fields_with_same_reponse_name.len() == 1 {
-            let field_ref = fields_with_same_reponse_name
-                .into_iter()
-                .next()
-                .unwrap()
-                .field_node;
+            let field_ref = fields_with_same_reponse_name.into_iter().next()?.field_node;
             SelectionRef::FieldRef(field_ref)
         } else {
             let nodes: Vec<FieldRef> = fields_with_same_reponse_name
@@ -754,7 +754,7 @@ fn flat_wrap(kind: NodeCollectionKind, mut nodes: Vec<PlanNode>) -> PlanNode {
     }
 
     if nodes.len() == 1 {
-        nodes.pop().unwrap()
+        nodes.pop()?
     } else {
         let nodes = nodes
             .into_iter()

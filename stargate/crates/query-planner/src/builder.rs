@@ -13,7 +13,7 @@ use crate::model::Selection as ModelSelection;
 use crate::model::SelectionSet as ModelSelectionSet;
 use crate::model::{FetchNode, FlattenNode, GraphQLDocument, PlanNode, QueryPlan, ResponsePath};
 use crate::{context, model, QueryPlanError, QueryPlanningOptions, Result};
-use anyhow::{Error, Result as AnyhowResult};
+use anyhow::Result as AnyhowResult;
 use graphql_parser::query::refs::{FieldRef, InlineFragmentRef, SelectionRef, SelectionSetRef};
 use graphql_parser::query::*;
 use graphql_parser::schema::TypeDefinition;
@@ -45,10 +45,15 @@ pub(crate) fn build_query_plan(
 
     let types = names_to_types(schema);
 
+    let operation = match ops.pop() {
+        Some(op) => Ok(op),
+        None => Err(QueryPlanError::MissingOperation),
+    };
+
     // TODO(ran)(p2)(#114) see if we can optimize and memoize the stuff we build only using the schema.
     let context = QueryPlanningContext {
         schema,
-        operation: ops.pop()?,
+        operation: operation?,
         fragments: query
             .definitions
             .iter()
@@ -247,7 +252,7 @@ fn split_fields<'a, 'q: 'a>(
     path: ResponsePath,
     fields: FieldSet<'q>,
     grouper: &'a mut dyn GroupForField<'q>,
-) {
+) -> Result<()> {
     let grouped = group_by(fields, |f| f.field_node.response_name());
     let fields_for_response_names: Vec<FieldSet> = values!(grouped);
 
@@ -332,6 +337,7 @@ fn split_fields<'a, 'q: 'a>(
             }
         }
     }
+    Ok(())
 }
 
 pub(crate) fn get_field_def_from_type<'q>(
@@ -349,8 +355,11 @@ pub(crate) fn get_field_def_from_type<'q>(
     }
 }
 
-fn return_type_not_composite_type(return_type: Option<&&TypeDefinition>) -> AnyhowResult<bool> {
-    Ok(!return_type?.is_composite_type())
+fn return_type_not_composite_type(return_type: Option<&&TypeDefinition>) -> Result<bool> {
+    match return_type {
+        Some(rt) => Ok(!rt.is_composite_type()),
+        None => Err(QueryPlanError::MissingReturnType),
+    }
 }
 
 fn complete_field<'a, 'q: 'a>(
@@ -359,7 +368,7 @@ fn complete_field<'a, 'q: 'a>(
     parent_group: &'a mut FetchGroup<'q>,
     path: ResponsePath,
     fields: FieldSet<'q>,
-) -> AnyhowResult<()> {
+) -> Result<()> {
     let field: context::Field = {
         let type_name = fields[0].field_def.field_type.as_name();
         // the type_name could be a primitive type which is not in our names_to_types map.
@@ -369,12 +378,9 @@ fn complete_field<'a, 'q: 'a>(
             let mut fields = fields;
             let field = match fields.pop() {
                 Some(field) => Ok(field),
-                None => Err(anyhow!("Expected a field where there was none")),
+                None => Err(QueryPlanError::MissingField),
             };
-            context::Field {
-                scope,
-                ..fields.pop()?
-            }
+            context::Field { scope, ..field? }
         } else {
             let return_type = return_type.expect("Already checked this is not None");
             let (head, tail) = fields.head();
@@ -406,7 +412,7 @@ fn complete_field<'a, 'q: 'a>(
 
             let fields: FieldSet = vec![head].into_iter().chain(tail).collect();
             let sub_fields = collect_sub_fields(context, return_type, fields);
-            let sub_group = split_sub_fields(context, field_path, sub_fields, sub_group);
+            let sub_group = split_sub_fields(context, field_path, sub_fields, sub_group)?;
 
             let selection_set_ref =
                 selection_set_from_field_set(sub_group.fields, Some(return_type), context);
@@ -426,6 +432,7 @@ fn complete_field<'a, 'q: 'a>(
         }
     };
     parent_group.fields.push(field);
+    Ok(())
 }
 
 fn add_path(mut path: ResponsePath, response_name: &str, typ: &Type) -> ResponsePath {
@@ -467,10 +474,14 @@ fn split_sub_fields<'q>(
     field_path: ResponsePath,
     sub_fields: FieldSet<'q>,
     parent_group: FetchGroup<'q>,
-) -> FetchGroup<'q> {
+) -> Result<FetchGroup<'q>> {
     let mut grouper = GroupForSubField::new(context, parent_group);
     split_fields(context, field_path, sub_fields, &mut grouper);
-    grouper.into_groups().pop()?
+
+    match grouper.into_groups().pop() {
+        Some(group) => Ok(group),
+        None => Err(QueryPlanError::MissingGroup),
+    }
 }
 
 fn execution_node_for_group(
@@ -576,25 +587,27 @@ fn selection_set_from_field_set<'q>(
     fn combine_fields<'q>(
         fields_with_same_reponse_name: FieldSet<'q>,
         context: &'q QueryPlanningContext,
-    ) -> SelectionRef<'q> {
+    ) -> Result<SelectionRef<'q>> {
         let is_composite_type = {
-            let name = fields_with_same_reponse_name[0]
-                .field_def
-                .field_type
-                .name()?;
+            let name = match fields_with_same_reponse_name[0].field_def.field_type.name() {
+                Some(name) => Ok(name),
+                None => Err(QueryPlanError::MissingTypeNameForField),
+            };
 
             // NB: we don't have specified types (i.e. primitives) in our map.
             // They are not composite types.
             context
                 .names_to_types
-                .get(name)
+                .get(name?)
                 .map(|td| td.is_composite_type())
                 .unwrap_or(false)
         };
 
         if !is_composite_type || fields_with_same_reponse_name.len() == 1 {
-            let field_ref = fields_with_same_reponse_name.into_iter().next()?.field_node;
-            SelectionRef::FieldRef(field_ref)
+            match fields_with_same_reponse_name.into_iter().next() {
+                Some(field_ref) => Ok(SelectionRef::FieldRef(field_ref.field_node)),
+                None => Err(QueryPlanError::TODO),
+            }
         } else {
             let nodes: Vec<FieldRef> = fields_with_same_reponse_name
                 .into_iter()
@@ -603,7 +616,7 @@ fn selection_set_from_field_set<'q>(
 
             let field_ref = field_ref!(nodes[0], merge_selection_sets(nodes));
 
-            SelectionRef::FieldRef(field_ref)
+            Ok(SelectionRef::FieldRef(field_ref))
         }
     }
 
@@ -611,6 +624,9 @@ fn selection_set_from_field_set<'q>(
 
     let fields_by_parent_type = group_by(fields, |f| f.scope.parent_type.as_name());
 
+    // fn map_selections(fs: Vec[Field], context: &QueryPlanningContext): Result {
+
+    // }
     for (_, fields_by_parent_type) in fields_by_parent_type {
         let type_condition = fields_by_parent_type[0].scope.parent_type;
         let directives = fields_by_parent_type[0].scope.scope_directives;
@@ -618,15 +634,13 @@ fn selection_set_from_field_set<'q>(
         let fields_by_response_name: LinkedHashMap<&str, FieldSet> =
             group_by(fields_by_parent_type, |f| f.field_node.response_name());
 
-        let selections = wrap_in_inline_fragment_if_needed(
-            fields_by_response_name
-                .into_iter()
-                .map(|(_, fs)| combine_fields(fs, context))
-                .collect(),
-            type_condition,
-            parent_type,
-            directives,
-        );
+        let selections = fields_by_response_name
+            .into_iter()
+            .map(|(_, fs)| combine_fields(fs, context)?)
+            .collect();
+
+        let selections =
+            wrap_in_inline_fragment_if_needed(selections, type_condition, parent_type, directives);
         items.extend(selections);
     }
 

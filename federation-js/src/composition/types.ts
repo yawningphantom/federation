@@ -32,6 +32,10 @@ export interface FederationType {
     [serviceName: string]: ExternalFieldDefinition[];
   };
   isValueType?: boolean;
+  //TODO - Possibly need to add nodes to get proper node.loc that aligns with the original schema file
+  nodes: {
+    [serviceName: string]: ReadonlyArray<ASTNode> | ASTNode | undefined | null
+  }
 }
 
 export interface FederationField {
@@ -39,6 +43,11 @@ export interface FederationField {
   requires?: ReadonlyArray<SelectionNode>;
   provides?: ReadonlyArray<SelectionNode>;
   belongsToValueType?: boolean;
+
+  //TODO - possibly add field, see TODO above
+  field: {
+    [serviceName: string]: ReadonlyArray<ASTNode> | ASTNode | undefined | null
+  }
 }
 
 export interface FederationDirective {

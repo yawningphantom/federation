@@ -45,7 +45,7 @@ export function MatchingEnums(context: SDLValidationContext): ASTVisitor {
     if (definitions.every(isEnumDefinition)) {
       // a simple list of services to enum values for a given enum
       // [{ serviceName: "serviceA", values: ["FURNITURE", "BOOK"] }]
-      let simpleEnumDefs: Array<{ serviceName: string; values: string[]}> = [];
+      let simpleEnumDefs: Array<{ serviceName: string; values: string[], ndoes: }> = [];
 
       // build the simpleEnumDefs list
       for (const {
@@ -57,7 +57,8 @@ export function MatchingEnums(context: SDLValidationContext): ASTVisitor {
             serviceName,
             values: values.map(
               (enumValue: EnumValueDefinitionNode) => enumValue.name.value,
-            )
+            ),
+            nodes
           });
       }
 

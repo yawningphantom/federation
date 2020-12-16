@@ -37,7 +37,6 @@ export function composeAndValidate(serviceList: ServiceDefinition[]) {
       ? printComposedSdl(compositionResult.schema, serviceList)
       : undefined;
 
-
   let typeMap = compositionResult.schema.getTypeMap();
   for (var typeName in typeMap) {
     let type = typeMap[typeName];
@@ -55,10 +54,9 @@ export function composeAndValidate(serviceList: ServiceDefinition[]) {
 
         for (var i = 0; i < fieldsToDelete.length; i++) {
           let indexToDelete = fieldsToDelete[i];
-          typeAstNode.fields.splice(indexToDelete, 1);
-
           let fieldName = (type.astNode as any).fields[indexToDelete].name.value;
           delete (typeMap[typeName] as any)._fields[fieldName];
+          typeAstNode.fields.splice(indexToDelete, 1);
         }
       }
     }

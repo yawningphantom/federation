@@ -31,6 +31,13 @@ export function composeAndValidate(serviceList: ServiceDefinition[]) {
     }),
   );
 
+  // We shouldn't try to print the SDL if there were errors during composition
+  const composedSdl =
+    errors.length === 0
+      ? printComposedSdl(compositionResult.schema, serviceList)
+      : undefined;
+
+
   let typeMap = compositionResult.schema.getTypeMap();
   for (var typeName in typeMap) {
     let type = typeMap[typeName];
@@ -56,13 +63,6 @@ export function composeAndValidate(serviceList: ServiceDefinition[]) {
       }
     }
   }
-
-  // We shouldn't try to print the SDL if there were errors during composition
-  const composedSdl =
-    errors.length === 0
-      ? printComposedSdl(compositionResult.schema, serviceList)
-      : undefined;
-
   // TODO remove the warnings array once no longer used by clients
   return {
     schema: compositionResult.schema,

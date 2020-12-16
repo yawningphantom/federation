@@ -37,20 +37,22 @@ export function composeAndValidate(serviceList: ServiceDefinition[]) {
     if (type.astNode) {
       let fieldsToDelete = [];
       let typeAstNode = type.astNode as any;
-      for (var i = 0; i < typeAstNode.fields.length; i++) {
-        let field = typeAstNode.fields[i];
-        if (field.directives.find((directive: any) => directive.name.value == 'internal'))
-          fieldsToDelete.push(i);
-      }
+      if (typeAstNode) {
+        for (var i = 0; i < typeAstNode.fields.length; i++) {
+          let field = typeAstNode.fields[i];
+          if (field.directives.find((directive: any) => directive.name.value == 'internal'))
+            fieldsToDelete.push(i);
+        }
 
-      fieldsToDelete.sort((a, b) => a < b ? a : b);
+        fieldsToDelete.sort((a, b) => a < b ? a : b);
 
-      for (var i = 0; i < fieldsToDelete.length; i++) {
-        let indexToDelete = fieldsToDelete[i];
-        typeAstNode.fields.splice(indexToDelete, 1);
+        for (var i = 0; i < fieldsToDelete.length; i++) {
+          let indexToDelete = fieldsToDelete[i];
+          typeAstNode.fields.splice(indexToDelete, 1);
 
-        let fieldName = (type.astNode as any).fields[indexToDelete].name.value;
-        delete (typeMap[typeName] as any)._fields[fieldName];
+          let fieldName = (type.astNode as any).fields[indexToDelete].name.value;
+          delete (typeMap[typeName] as any)._fields[fieldName];
+        }
       }
     }
   }

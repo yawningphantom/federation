@@ -37,7 +37,7 @@ export function composeAndValidate(serviceList: ServiceDefinition[]) {
     if (type.astNode) {
       let fieldsToDelete = [];
       let typeAstNode = type.astNode as any;
-      if (typeAstNode) {
+      if (typeAstNode && typeAstNode.fields) {
         for (var i = 0; i < typeAstNode.fields.length; i++) {
           let field = typeAstNode.fields[i];
           if (field.directives.find((directive: any) => directive.name.value == 'internal'))

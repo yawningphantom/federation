@@ -56,7 +56,6 @@ export function composeAndValidate(serviceList: ServiceDefinition[]) {
           let indexToDelete = fieldsToDelete[i];
           let fieldName = (type.astNode as any).fields[indexToDelete].name.value;
           delete (typeMap[typeName] as any)._fields[fieldName];
-          typeAstNode.fields.splice(indexToDelete, 1);
         }
       }
     }

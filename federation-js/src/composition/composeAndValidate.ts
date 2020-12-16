@@ -48,6 +48,9 @@ export function composeAndValidate(serviceList: ServiceDefinition[]) {
       for (var i = 0; i < fieldsToDelete.length; i++) {
         let indexToDelete = fieldsToDelete[i];
         typeAstNode.fields.splice(indexToDelete, 1);
+
+        let fieldName = (type.astNode as any).fields[indexToDelete].name.value;
+        delete (typeMap[typeName] as any)._fields[fieldName];
       }
     }
   }

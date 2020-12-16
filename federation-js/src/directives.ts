@@ -61,12 +61,18 @@ export const ProvidesDirective = new GraphQLDirective({
   },
 });
 
+export const InternalDirective = new GraphQLDirective({
+  name: 'internal',
+  locations: [DirectiveLocation.FIELD_DEFINITION],
+})
+
 export const federationDirectives = [
   KeyDirective,
   ExtendsDirective,
   ExternalDirective,
   RequiresDirective,
   ProvidesDirective,
+  InternalDirective
 ];
 
 export default federationDirectives;

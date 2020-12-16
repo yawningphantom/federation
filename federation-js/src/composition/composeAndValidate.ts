@@ -31,6 +31,27 @@ export function composeAndValidate(serviceList: ServiceDefinition[]) {
     }),
   );
 
+  let typeMap = compositionResult.schema.getTypeMap();
+  for (var typeName in typeMap) {
+    let type = typeMap[typeName];
+    if (type.astNode) {
+      let fieldsToDelete = [];
+      let typeAstNode = type.astNode as any;
+      for (var i = 0; i < typeAstNode.fields.length; i++) {
+        let field = typeAstNode.fields[i];
+        if (field.directives.find((directive: any) => directive.name.value == 'internal'))
+          fieldsToDelete.push(i);
+      }
+
+      fieldsToDelete.sort((a, b) => a < b ? a : b);
+
+      for (var i = 0; i < fieldsToDelete.length; i++) {
+        let indexToDelete = fieldsToDelete[i];
+        typeAstNode.fields.splice(indexToDelete, 1);
+      }
+    }
+  }
+
   // We shouldn't try to print the SDL if there were errors during composition
   const composedSdl =
     errors.length === 0

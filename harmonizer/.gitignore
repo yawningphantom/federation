@@ -1,2 +1,9 @@
 /target
+
+# This is a library so it has a default ignore on `Cargo.lock`
+# (by convention and recommendation by Rust).
 Cargo.lock
+
+# This is a generated artifact that is created during the build step of this
+# library.  It is not meant to be committed.
+/src/composition.js

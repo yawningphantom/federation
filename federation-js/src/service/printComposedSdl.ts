@@ -301,7 +301,7 @@ function printFields(
       ': ' +
       String(f.type) +
       printDeprecated(f) +
-      printFederationFieldDirectives(f, type),
+      printFederationFieldDirectives(f),
   );
 
   // Federation change: for entities, we want to print the block on a new line.
@@ -330,11 +330,9 @@ function printFieldSet(selections: readonly SelectionNode[]): string {
  * Federation change: print @resolve, @requires, and @provides directives
  *
  * @param field
- * @param parentType
  */
 function printFederationFieldDirectives(
   field: GraphQLField<any, any>,
-  parentType: GraphQLObjectType | GraphQLInterfaceType,
 ): string {
   if (!field.extensions?.federation) return '';
 

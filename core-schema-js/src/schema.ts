@@ -3,7 +3,6 @@ import type { DocumentNode, SchemaDefinitionNode } from 'graphql'
 
 import { asSource, AsSource, Source } from './source-map'
 
-import { Sel, Selection } from './proc'
 import { data, set } from './data'
 
 import ERROR, { isErr, isOk, Ok } from './err'
@@ -15,27 +14,22 @@ import { Layer } from './layer'
 import { Binding, Specified } from './spec'
 
 const ErrNoSchemas = ERROR `NoSchemas` (() =>
-  `no schema definition found`
-)
+  `no schema definition found`)
 
 const ErrExtraSchema = ERROR `ExtraSchema` (() =>
-  `extra schema definition ignored`
-)
+  `extra schema definition ignored`)
 
 const ErrNoCore = ERROR `NoCore` (() =>
   `@core(using: "${core}") directive required on schema definition`)
 
-const ErrCoreSpecIdentity = ERROR `NoCoreSpecIdentity` (
-  (props: { got: string }) =>
-    `the first @core directive must reference "${core.identity}", got: "${props.got}"`)
+const ErrCoreSpecIdentity = ERROR `NoCoreSpecIdentity` ((props: { got: string }) =>
+  `the first @core directive must reference "${core.identity}", got: "${props.got}"`)
 
 const ErrBadUsingRequest = ERROR `BadUsingRequest` (() =>
-  `@core(using:) invalid`
-)
+  `@core(using:) invalid`)
 
 const ErrDocumentNotOk = ERROR `DocumentNotOk` (() =>
   `one or more errors on document`)
-
 
 /**
  * Schema source

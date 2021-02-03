@@ -1,5 +1,5 @@
 import { ASTNode } from 'graphql'
-import { AsString, asString } from './is'
+import { AsString, asString, Fn, FnPropsOf } from './is'
 import sourceMap, { Source, SourceMap } from './source-map'
 
 export interface Err {
@@ -11,6 +11,7 @@ export interface Err {
   readonly node?: ASTNode
   readonly causes: (Err | Error)[]
   toString(mapSource?: SourceMap): string
+  toError(mapSource?: SourceMap): Error
 }
 
 export interface Ok<T> {
@@ -26,6 +27,7 @@ export function ok<T>(ok: T) {
 }
 
 export type Result<T> = Ok<T> | Err
+export type OkTypeOf<R extends Result<any>> = R extends Result<infer T> ? T : never
 
 export function isErr(o: any): o is Err {
   return o?.is === 'err'
@@ -35,12 +37,14 @@ export function isOk<T>(o: any): o is Ok<T> {
   return o?.is === 'ok'
 }
 
-export function asResultFn<F extends (...args: any[]) => any>(fn: F): (...args: Parameters<F>) => Result<ReturnType<F>> {
-  return (...args) => {
+export function asResultFn<F extends (...args: any) => any>(fn: F) {
+  return apply
+
+  function apply(...args: Parameters<F>): Result<ReturnType<F>> {
     try {
       return {
         is: 'ok',
-        ok: fn(...args)
+        ok: fn.apply(null, args)
       }
     } catch(error) {
       const err = Object.create(FROM_ERROR)
@@ -50,7 +54,6 @@ export function asResultFn<F extends (...args: any[]) => any>(fn: F): (...args: 
   }
 }
 
-type OkOf<R extends Result<any>> = R extends Result<infer T> ? T : never
 
 export function sift<T>(results: Result<T>[]): [Err[], T[]] {
   const okays: T[] = [], errors: Err[] = []
@@ -63,11 +66,12 @@ export function sift<T>(results: Result<T>[]): [Err[], T[]] {
   return [errors, okays]
 }
 
+
 export default function err(...code: AsString) {
   const codeStr = asString(code)
   return createWithFormatter
 
-  function createWithFormatter<F extends Fn<any, string>>(fmt: F): (input?: Parameters<F>[0] | Partial<Err>, ...causes: (Err | Error)[]) => Parameters<F>[0] & Err {
+  function createWithFormatter<F extends Fn<any, string>>(fmt: F): (input?: FnPropsOf<F> | Partial<Err>, ...causes: (Err | Error)[]) => FnPropsOf<F> & Err {
     const proto = Object.create(BASE, {
       code: {
         get() { return codeStr }
@@ -82,7 +86,7 @@ export default function err(...code: AsString) {
   }
 }
 
-const BASE = { is: 'err', toString, causes: Object.freeze([]) }
+const BASE = { is: 'err', toString, causes: Object.freeze([]), toError }
 const FROM_ERROR = Object.create(BASE, {
   message: {
     get() {
@@ -102,4 +106,10 @@ function toString(this: Err, mapSource: SourceMap = sourceMap(this.source)) {
     str += '\n  - ' + cause.toString(mapSource).split('\n').join('\n    ')
   }
   return str
+}
+
+function toError(this: Err, mapSource: SourceMap = sourceMap(this.source)) {
+  const error = new Error(this.toString(mapSource))
+  Object.assign(error, this)
+  return error
 }

@@ -1,15 +1,21 @@
-import { ASTNode, DirectiveNode, parse as parseSchema, visit } from 'graphql'
+import { DirectiveNode, parse as parseSchema, visit } from 'graphql'
 import type { DocumentNode, SchemaDefinitionNode } from 'graphql'
 
-import sourceMap, { asSource, AsSource, Source, SourceMap } from './source-map'
+import { asSource, AsSource, Source } from './source-map'
 
-import { Sel, select, Selection } from './proc'
+import { Sel, Selection } from './proc'
 import { data, set } from './data'
 
-import ERROR, { isErr, isOk, Ok, sift } from './err'
+import ERROR, { isErr, isOk, Ok } from './err'
+
+import { core, Using } from './specs/core'
+import { metadata } from './metadata'
+import { Err } from './err'
+import { Layer } from './layer'
+import { Binding, Specified } from './spec'
 
 const ErrNoSchemas = ERROR `NoSchemas` (() =>
-  `core schemas must contain a GraphQL schema definition`
+  `no schema definition found`
 )
 
 const ErrExtraSchema = ERROR `ExtraSchema` (() =>
@@ -17,7 +23,7 @@ const ErrExtraSchema = ERROR `ExtraSchema` (() =>
 )
 
 const ErrNoCore = ERROR `NoCore` (() =>
-  `@core(using: "${core.toString()}") directive required on schema definition`)
+  `@core(using: "${core}") directive required on schema definition`)
 
 const ErrCoreSpecIdentity = ERROR `NoCoreSpecIdentity` (
   (props: { got: string }) =>
@@ -27,29 +33,9 @@ const ErrBadUsingRequest = ERROR `BadUsingRequest` (() =>
   `@core(using:) invalid`
 )
 
-export class Schema extends Sel implements Selection<Schema> {
-  public static parse(...input: AsSource): Schema {
-    return new Schema(asSource(input))
-  }
+const ErrDocumentNotOk = ERROR `DocumentNotOk` (() =>
+  `one or more errors on document`)
 
-  constructor(public readonly source: Source) { super() }
-
-  get document() { return document(this.source) }
-  get errors() { return errors(this.document) }
-  get schema() { return theSchema(this.document) }
-
-  ok(): ValidSchema {
-    const err = errors(this.document)
-    if (err.length) throw err
-    return this as ValidSchema
-  }
-}
-
-export default Schema
-
-export interface ValidSchema extends Schema {
-  readonly schema: SchemaDefinitionNode
-}
 
 /**
  * Schema source
@@ -69,29 +55,69 @@ const document = data <DocumentNode, Source> `Document AST Node` .orElse(
 const errors = data<Err[], DocumentNode> `Document errors`
   .orElse(() => [])
 
+export class Schema {
+  public static parse(...input: AsSource): Schema {
+    return new Schema(asSource(input))
+  }
+
+  constructor(public readonly source: Source) { }
+
+  get document() { return document(this.source) }
+  get errors() { return errors(this.document) }
+  get schema() { return theSchema(this.document) }
+
+  attach(...layers: Layer[]): this {
+    const onErr = addError(this.document)
+    const visitors = this.using.flatMap(
+      req =>
+        layers.map(layer => layer(this.document)(req)!)
+    ).filter(Boolean)
+    visit(this.document, {
+      Directive(node, _key, ancestors: any) {
+        for (const v of visitors) {
+          v(node, ancestors[ancestors.length - 1], onErr)
+        }
+      }
+    })
+    return this
+  }
+
+  find<S extends Specified<any>>(md: S): S extends Specified<infer T> ? Binding<T>[] : never {
+    return md.index(this.document) as any
+  }
+
+  get using() { return using(this.document) }
+
+  ok(): ValidSchema {
+    // Bootstrap if we haven't already
+    using(this.document)
+    const err = errors(this.document)
+    if (err.length)
+      throw ErrDocumentNotOk({
+        node: this.document,
+        source: this.source
+      }, ...err).toError()
+    return this as ValidSchema
+  }
+}
+
+export default Schema
+
+export interface ValidSchema extends Schema {
+  readonly schema: SchemaDefinitionNode
+}
 
 const addError = data <(...err: Err[]) => void, DocumentNode> `Report a document error`
   .orElse(doc => {
     const src = source(doc)
+    const docErrors = errors(doc)
     return (...errs: Err[]) => {
       for (const err of errs) {
         ;(err as any).source = src
-        errors(doc).push(err)
+        docErrors.push(err)
       }
     }
   })
-
-
-interface Traversal {
-  schema?: SchemaDefinitionNode,
-  errors: Error[]
-}
-
-/**
- * Format a location within a source
- */
-const formatLoc = data <SourceMap, Source | undefined> `Document source map`
-  .orElse(sourceMap as any)
 
 const theSchema =
   data <SchemaDefinitionNode | undefined, DocumentNode>
@@ -117,16 +143,20 @@ const theSchema =
     })
 
 
-import { core, Using } from './specs/core'
-import { metadata } from './metadata'
-import { Err } from './err'
-
 const using =
   data <Using[], DocumentNode>
   `Specs in use by this schema`
   .orElse(doc => {
+    // Perform bootstrapping on the schema
     const schema = theSchema(doc)
     if (!schema) return []
+
+    // Try to deserialize every directive on the schema element as a
+    // core.Using input.
+    //
+    // This uses the deserializer directly, not checking the name of the
+    // directive. We need to do this during bootstrapping in order to discover
+    // the name of @core within this document.
     const using = (schema.directives ?? [])
       .filter(d => 'using' in metadata(d))
       .map(d => ({
@@ -134,6 +164,11 @@ const using =
         directive: d
       }))
 
+    // Core schemas MUST reference the core spec as the first @core directive
+    // on their schema element.
+    //
+    // Find this directive. (Note that this scan is more permissive than the spec
+    // requires, allowing the @core(using:) dire)
     const coreReq = using.find(d =>
       isOk(d.result) &&
       d.directive.name.value === (d.result.ok!.as ?? core.name)
@@ -167,33 +202,3 @@ const using =
     )
     return good.map(u => (u.result as Ok<Using>).ok)
   })
-
-const example = Schema.parse({
-  src: 'example.graphql',
-  text:
-    `
-      schema
-        @core(using: "https://lib.apollo.dev/core/v0.1")
-        @core(using: "https://lib.apollo.dev/join/v0.1")
-
-      {
-        query: Query
-      }
-
-      type Query {
-        value: Int
-      }
-
-    `
-  })
-  .ok()
-
-console.log(using(example.document))
-example.errors.forEach((e, i) => {
-  console.log('error #', i)
-  console.log(e.toString())
-})
-// for (const e of example.errors) {
-//   console.log('--- error', )
-// }
-// console.log(example.errors.map(x => x.toString()).join('\n'))

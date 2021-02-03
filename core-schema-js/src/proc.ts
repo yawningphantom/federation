@@ -29,7 +29,6 @@ export abstract class Sel {
   }
 }
 
-
 export class SelFrom<T extends object, C extends Data<any, T>> extends Sel implements SelectionMut<DataValue<C>> {
   constructor(readonly target: T, readonly column: C) { super() }
 

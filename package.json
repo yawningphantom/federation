@@ -62,6 +62,7 @@
   },
   "jest": {
     "projects": [
+      "<rootDir>/core-schema-js",
       "<rootDir>/federation-js",
       "<rootDir>/federation-integration-testsuite-js",
       "<rootDir>/gateway-js"

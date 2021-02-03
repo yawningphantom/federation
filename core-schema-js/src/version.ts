@@ -1,10 +1,16 @@
-import { errors } from './errors'
+import { default as ERROR, isErr, ok, Result } from './err'
 import { asString, AsString } from './is'
+
+export type AsVersion = AsString | [number, number]
 
 export default (...input: AsVersion) => Version.from(...input)
 
+export const ErrVersionParse = ERROR `VersionParse` (
+  (props: { got: string }) =>
+    `expected a version specifier like "v9.8", got "${props.got}"`)
+
 /**
- * Versions are a (major, minor) u64 pair.
+ * Versions are a (major, minor) number pair.
  *
  * Versions implement `PartialOrd` and `Ord`, which orders them by major and then
  * minor version. Be aware that this ordering does *not* imply compatibility. For
@@ -16,7 +22,7 @@ export class Version {
   constructor(public readonly major: number, public readonly minor: number) {}
 
   /**
-   * Parse a version specifier of the form "v(major).(minor)"
+   * Parse a version specifier of the form "v(major).(minor)" or throw
    *
    * # Example
    * ```
@@ -28,14 +34,22 @@ export class Version {
    * ```
    */
   public static parse(input: string): Version {
+    const result = this.decode(input)
+    if (isErr(result)) throw result.toError()
+    return result.ok
+  }
+
+  public static decode(input: string): Result<Version> {
     const match = input.match(this.VERSION_RE)
-    if (!match) throw new ERR.VersionParse({ input })
-    return new this(+match[1], +match[2])
+    if (!match) return ErrVersionParse({ got: input })
+    return ok(new this(+match[1], +match[2]))
   }
 
   public static from(...input: AsVersion) {
     const str = asString(input)
-    return str ? Version.parse(str) : new Version(...input as [number, number])
+    return str
+      ? Version.parse(str.startsWith('v') ? str : `v${str}`)
+      : new Version(...input as [number, number])
   }
 
   /**
@@ -65,15 +79,6 @@ export class Version {
 
   private static VERSION_RE = /^v(\d+)\.(\d+)$/
 }
-
-type AsVersion = AsString | [number, number]
-
-export const ERR = errors({
-  VersionParse: ({ input }: { input: string }) =>
-    `expected a version specifier like "v9.8", got "${input}"`
-})
-
-
 
 
 // #[cfg(test)]

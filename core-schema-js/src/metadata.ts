@@ -1,7 +1,7 @@
 import { ValueNode, DirectiveNode, EnumValueNode, FloatValueNode, IntValueNode, ListValueNode, ObjectValueNode, StringValueNode, NullValueNode, BooleanValueNode, VariableNode, ASTNode, ObjectFieldNode, ArgumentNode, isValueNode, DocumentNode, Location } from 'graphql'
 import data from './data'
 import { errors } from './errors'
-import { asString, AsString } from './is'
+import { asString, AsString, Fn } from './is'
 import sourceMap, { SourceMap } from './source-map'
 
 export interface Metadata {
@@ -32,6 +32,7 @@ export type RawKind = (
   | FloatValueNode
   | IntValueNode
   | NullValueNode
+  | BooleanValueNode
 )["kind"]
 
 
@@ -70,7 +71,7 @@ export type Must<T> = Exclude<T, null | undefined>
 const isNullNode = (n: any): n is NullValueNode => n.kind === 'NullValue'
 
 
-import ERROR, { isErr, isOk, ok, Result, sift } from './err'
+import ERROR, { asResultFn, isErr, isOk, ok, OkTypeOf, Result, sift } from './err'
 
 const EReadField = ERROR `ReadField` (
   (props: { name: string }) => `could not read field "${props.name}"`
@@ -86,11 +87,21 @@ const EBadReadNode = ERROR `BadReadNode` (
 )
 
 
+type InputNodeOf<D extends Deserialize<any, any>> =
+  D extends Deserialize<any, infer I>
+    ? I
+    : never
+
+type OutputNodeOf<S extends Serialize<any, any>> =
+    S extends Serialize<any, infer O>
+      ? O
+      : never
+
 export class Slot<T, I extends ASTNode, O extends ValueNode>
   implements
     Serialize<T, O>,
     Deserialize<T, I>
-   {
+{
   constructor(
     public readonly serialize: Serde<T, O>["serialize"],
     public readonly deserialize: Serde<T, I>["deserialize"]
@@ -111,6 +122,10 @@ export class Slot<T, I extends ASTNode, O extends ValueNode>
     })
   }
 
+  mapDe<F extends Fn<I, any>>(fn: F): Slot<ReturnType<F>, I, O> {
+    return mapDe(this, fn as any)
+  }
+
   get maybe(): Slot<Maybe<T>, I | NullValueNode, O | NullValueNode> {
     return maybe(this) as any
   }
@@ -118,6 +133,22 @@ export class Slot<T, I extends ASTNode, O extends ValueNode>
   get must(): Slot<Must<T>, Exclude<I, NullValueNode>, Exclude<O, NullValueNode>> {
     return must(this) as any
   }
+}
+
+export function mapDe<
+  S extends Slot<any, any, any>,
+  F extends Fn<Deserialized<S>, any>
+>(slot: S, fn: F): Slot<ReturnType<F>, InputNodeOf<S>, OutputNodeOf<S>> {
+  const resultFn = asResultFn(fn) as any
+  return Object.create(slot, {
+    deserialize: {
+      value(node: Maybe<InputNodeOf<S>>) {
+        const result = slot.deserialize(node)
+        if (!isOk(result)) return result
+        return resultFn(result.ok)
+      }
+    }
+  })
 }
 
 
@@ -154,7 +185,7 @@ const EReadNaN = ERROR `ReadNaN`
 const EReadIntRange = ERROR `ReadIntRange`
   ((props: { repr: string }) => `"${props.repr}" out of range for integers`)
 
-export const int = scalar(
+export const Int = scalar(
   'IntValue',
   repr => {
     const decoded = +repr
@@ -164,7 +195,12 @@ export const int = scalar(
   }
 )
 
-export const float = scalar(
+export const Bool = scalar(
+  'BooleanValue',
+  repr => ok(!!repr),
+)
+
+export const Float = scalar(
   'FloatValue',
   repr => {
     const decoded = +repr
@@ -173,15 +209,21 @@ export const float = scalar(
   }
 )
 
-export const str = scalar(
+export const Str = scalar(
   'StringValue',
   repr => ok(repr),
 )
 
-export function customScalar<T>(
-  decode: (repr: string) => Result<T>,
-  encode: (value: T) => string = v => String(v)
-) {
+export interface Coder<T> {
+  decode(repr: string): Result<T>,
+  encode?(value: T): string
+}
+
+export function customScalar<T>(coder: Coder<T>) {
+  const encode = coder.encode
+    ? (value: T) => coder.encode!(value)
+    : (value: T) => String(value)
+  const decode = (repr: string) => coder.decode(repr)
   return scalar('StringValue', decode, encode)
 }
 
@@ -242,17 +284,17 @@ export interface ObjShape {
   [key: string]: Serde<any, any>
 }
 
-type DeserializedShape<S extends ObjShape> = {
+export type DeserializedShape<S extends ObjShape> = {
   [K in keyof S]: Deserialized<S[K]>
 }
 
-export function obj<S extends ObjShape>(shape: S):
-  Slot<
-    Maybe<DeserializedShape<S>>,
-    ObjectValueNode | NullValueNode | DirectiveNode,
-    ObjectValueNode | NullValueNode
-  >
-{
+export type ObjOf<S extends ObjShape> = Slot<
+  Maybe<DeserializedShape<S>>,
+  ObjectValueNode | NullValueNode | DirectiveNode,
+  ObjectValueNode | NullValueNode
+>
+
+export function obj<S extends ObjShape>(shape: S): ObjOf<S> {
   return slot(
     (value: DeserializedShape<S>) => {
       if (!value) return NullValue
@@ -307,4 +349,4 @@ function serializeFields<
 const NullValue = { kind: 'NullValue' as 'NullValue' }
 
 const hasValue = (o: any): o is { value: string } =>
-  typeof o?.value === 'string'
+  typeof o?.value !== 'undefined'

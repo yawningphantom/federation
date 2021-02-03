@@ -44,6 +44,10 @@ export class Spec {
     url.pathname = path.join('/')
     return new Spec(url.toString(), name, version)
   }
+
+  toString() {
+    return `${this.identity}/${this.version}`
+  }
 }
 
 export const spec = (...input: AsString) =>

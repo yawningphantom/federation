@@ -1,13 +1,14 @@
 import { ASTNode } from 'graphql'
 import { AsString, asString } from './is'
-import sourceMap, { SourceMap } from './source-map'
+import sourceMap, { Source, SourceMap } from './source-map'
 
 export interface Err {
   readonly is: 'err',
   readonly code: string
   readonly message: string
-  readonly doc?: ASTNode | undefined | null
-  readonly node?: ASTNode | undefined | null
+  readonly source?: Source
+  readonly doc?: ASTNode
+  readonly node?: ASTNode
   readonly causes: (Err | Error)[]
   toString(mapSource?: SourceMap): string
 }
@@ -95,7 +96,7 @@ const FROM_ERROR = Object.create(BASE, {
   },
 })
 
-function toString(this: Err, mapSource: SourceMap = sourceMap()) {
+function toString(this: Err, mapSource: SourceMap = sourceMap(this.source)) {
   let str = `[${this.code ?? 'UNKNOWN'}] ${mapSource(this.node?.loc)}: ${this.message}`
   for (const cause of this.causes) {
     str += '\n  - ' + cause.toString(mapSource).split('\n').join('\n    ')

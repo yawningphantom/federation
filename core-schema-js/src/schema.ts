@@ -17,8 +17,11 @@ const ErrExtraSchema = ERROR `ExtraSchema` (() =>
 )
 
 const ErrNoCore = ERROR `NoCore` (() =>
-  `the first @core(using:) directive must reference the core spec itself`
-)
+  `@core(using: "${core.toString()}") directive required on schema definition`)
+
+const ErrCoreSpecIdentity = ERROR `NoCoreSpecIdentity` (
+  (props: { got: string }) =>
+    `the first @core directive must reference "${core.identity}", got: "${props.got}"`)
 
 const ErrBadUsingRequest = ERROR `BadUsingRequest` (() =>
   `@core(using:) invalid`
@@ -61,19 +64,22 @@ const document = data <DocumentNode, Source> `Document AST Node` .orElse(
 )
 
 /**
- * Document errors
- *
- * Errors are reported on both the document node and the node on which
- * the error occurred
+ * Errors in this document
  */
-const errors = data <Err[], ASTNode> `Errors on each node`
+const errors = data<Err[], DocumentNode> `Document errors`
   .orElse(() => [])
 
-/**
- *
- */
-// const allErrors = data <Error[], Traversal> `All errors on document`
-//   .orElse(traversal => traversal.errors)
+
+const addError = data <(...err: Err[]) => void, DocumentNode> `Report a document error`
+  .orElse(doc => {
+    const src = source(doc)
+    return (...errs: Err[]) => {
+      for (const err of errs) {
+        ;(err as any).source = src
+        errors(doc).push(err)
+      }
+    }
+  })
 
 
 interface Traversal {
@@ -92,6 +98,7 @@ const theSchema =
     `The schema definition node`
     .orElse(doc => {
       let schema: SchemaDefinitionNode | undefined = void 0
+      const report = addError(doc)
       for (const def of doc.definitions) {
         if (def.kind === 'SchemaDefinition') {
           if (!schema) {
@@ -99,20 +106,19 @@ const theSchema =
             continue
           }
           const error = ErrExtraSchema({ doc, node: def })
-          errors(def).push(error)
-          errors(doc).push(error)
+          report(error)
         }
       }
       if (!schema) {
         const error = ErrNoSchemas({ doc })
-        errors(doc).push(error)
+        report(error)
       }
       return schema
     })
 
 
 import { core, Using } from './specs/core'
-import { Maybe, metadata } from './metadata'
+import { metadata } from './metadata'
 import { Err } from './err'
 
 const using =
@@ -128,29 +134,36 @@ const using =
         directive: d
       }))
 
-    const coreReq = using.find(d => isOk(d.result)) as {
+    const coreReq = using.find(d =>
+      isOk(d.result) &&
+      d.directive.name.value === (d.result.ok!.as ?? core.name)
+    ) as {
       result: Ok<Using>,
       directive: DirectiveNode
     }
 
+    const report = addError(doc)
+
     if (!coreReq) {
-      errors(doc).push(ErrNoCore({ doc, node: schema }))
+      report(ErrNoCore({ doc, node: schema }))
       return []
     }
 
     const {result: {ok: coreUse}, directive} = coreReq
 
-    if (coreUse.using.identity !== core.identity ||
-        (directive.name.value !== (coreUse.as ?? core.name))) {
-      errors(doc).push(ErrNoCore({ doc, node: directive ?? schema }))
+    if (coreUse.using.identity !== core.identity) {
+      report(ErrCoreSpecIdentity({ doc, node: directive ?? schema, got: coreUse.using.identity }))
       return []
     }
+
     const requests = using.filter(u => u.directive.name.value === directive.name.value)
     const bad = requests.filter(u => isErr(u.result))
     const good = requests.filter(u => isOk(u.result))
-    errors(doc).push(
-      ...bad.map(bad =>
-        ErrBadUsingRequest({ doc, node: bad.directive }, bad.result as Err))
+    report(
+      ...bad.map(
+        bad =>
+          ErrBadUsingRequest({ doc, node: bad.directive }, bad.result as Err)
+      )
     )
     return good.map(u => (u.result as Ok<Using>).ok)
   })
@@ -161,7 +174,8 @@ const example = Schema.parse({
     `
       schema
         @core(using: "https://lib.apollo.dev/core/v0.1")
-        @core(using: "https://lib.apollo.dev/core/v0.1")
+        @core(using: "https://lib.apollo.dev/join/v0.1")
+
       {
         query: Query
       }
@@ -169,6 +183,7 @@ const example = Schema.parse({
       type Query {
         value: Int
       }
+
     `
   })
   .ok()
@@ -176,7 +191,7 @@ const example = Schema.parse({
 console.log(using(example.document))
 example.errors.forEach((e, i) => {
   console.log('error #', i)
-  console.log(e.toString(formatLoc(source(example.document))))
+  console.log(e.toString())
 })
 // for (const e of example.errors) {
 //   console.log('--- error', )

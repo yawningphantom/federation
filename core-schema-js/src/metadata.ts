@@ -230,7 +230,7 @@ export function list<T, V extends ValueNode>(type: Serde<T, V>) {
       const results = ((node as ListValueNode)?.values ?? [])
         .map(v => type.deserialize(v as any))
       const [errors, okays] = sift(results)
-      if (errors.length) return EReadList({ node }, ...errors)
+      if (errors.length) return EReadList({ node: node! }, ...errors)
       return ok(okays)
     }
   )

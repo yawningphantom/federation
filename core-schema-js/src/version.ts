@@ -60,7 +60,7 @@ export class Version {
   }
 
   public toString() {
-    return `v${this.major}${this.minor}`
+    return `v${this.major}.${this.minor}`
   }
 
   private static VERSION_RE = /^v(\d+)\.(\d+)$/

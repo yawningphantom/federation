@@ -45,10 +45,18 @@ describe("the Schema class", () => {
           schema { query: Query }
         `,
       });
-      expect(() => example.ok()).toThrowErrorMatchingInlineSnapshot(`
-        "[DocumentNotOk] extra-schema.graphql:1:0: one or more errors on document
-          - [ExtraSchema] extra-schema.graphql:5:11: extra schema definition ignored"
-      `);
+
+      let wasOk = false;
+      try {
+        example.ok();
+        wasOk = true;
+      } catch (err) {
+        expect(err.toString()).toMatchInlineSnapshot(`
+          "Error: [DocumentNotOk] extra-schema.graphql:1:0: one or more errors on document
+            - [ExtraSchema] extra-schema.graphql:5:11: extra schema definition ignored"
+        `);
+      }
+      expect(wasOk).toBeFalsy();
     });
   });
 });

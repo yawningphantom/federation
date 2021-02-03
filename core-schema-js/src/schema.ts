@@ -1,15 +1,11 @@
-import { DirectiveNode, parse as parseSchema, visit } from 'graphql'
+import { ASTNode, DirectiveNode, parse as parseSchema, visit } from 'graphql'
 import type { DocumentNode, SchemaDefinitionNode } from 'graphql'
 
 import { asSource, AsSource, Source } from './source-map'
-
 import { data, set } from './data'
-
-import ERROR, { isErr, isOk, Ok } from './err'
-
+import ERROR, { Err, isErr, isOk, Ok } from './err'
 import { core, Using } from './specs/core'
 import { metadata } from './metadata'
-import { Err } from './err'
 import { Layer } from './layer'
 import { Binding, Specified } from './spec'
 
@@ -32,16 +28,21 @@ const ErrDocumentNotOk = ERROR `DocumentNotOk` (() =>
   `one or more errors on document`)
 
 /**
- * Schema source
+ * Source for document
  */
-const source = data <Source> `Document source`
+export const source = data <Source, DocumentNode> `Document source`
 
 /**
- * Document AST Node
+ * Document for source
  */
-const document = data <DocumentNode, Source> `Document AST Node` .orElse(
+const document = data <DocumentNode, Source> `Document for source` .orElse(
   src => set(parseSchema(src.text), source, src)
 )
+
+/**
+ * Document of node
+ */
+export const documentOf = data <DocumentNode, ASTNode> `Document for node`
 
 /**
  * Errors in this document

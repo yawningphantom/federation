@@ -2,20 +2,13 @@
 //!
 //! `Request`s are derived from `Directive`s during schema bootstrapping.
 
-import { customScalar, Deserialized, err, Must, obj, ok, str } from '../metadata'
+import { customScalar, Deserialized, Must, obj, str } from '../metadata'
+import { asResultFn } from '../err'
 import { spec, Spec } from '../spec'
 
 export const core = spec `https://lib.apollo.dev/core/v0.1`
 
-export const SpecUrl = customScalar(
-  (repr: string) => {
-    try {
-      return ok(Spec.parse(repr))
-    } catch(error) {
-      return err(error)
-    }
-  }
-)
+export const SpecUrl = customScalar(asResultFn(Spec.parse))
 
 export const Using = obj({
   using: SpecUrl.must,

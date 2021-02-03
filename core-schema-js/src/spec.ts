@@ -42,7 +42,7 @@ export class Spec {
     url.password = ''
     url.username = ''
     url.pathname = path.join('/')
-    return new this(url.toString(), name, version)
+    return new Spec(url.toString(), name, version)
   }
 }
 

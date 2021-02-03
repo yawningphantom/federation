@@ -1,5 +1,5 @@
 import { errors } from './errors'
-import { asString, AsString, isAsString } from './is'
+import { asString, AsString } from './is'
 
 export default (...input: AsVersion) => Version.from(...input)
 

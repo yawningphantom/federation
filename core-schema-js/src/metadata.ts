@@ -1,4 +1,4 @@
-import { ValueNode, DirectiveNode, EnumValueNode, FloatValueNode, IntValueNode, ListValueNode, ObjectValueNode, StringValueNode, NullValueNode, BooleanValueNode, VariableNode, ASTNode, ObjectFieldNode, ArgumentNode, isValueNode, DocumentNode } from 'graphql'
+import { ValueNode, DirectiveNode, EnumValueNode, FloatValueNode, IntValueNode, ListValueNode, ObjectValueNode, StringValueNode, NullValueNode, BooleanValueNode, VariableNode, ASTNode, ObjectFieldNode, ArgumentNode, isValueNode, DocumentNode, Location } from 'graphql'
 import data from './data'
 import { errors } from './errors'
 import { asString, AsString } from './is'
@@ -64,40 +64,27 @@ export type Serialized<S extends Serialize<any, any> | Deserialize<any, any>> =
 export type Serde<T, N extends ASTNode>
   = Serialize<T, N> & Deserialize<T, N>
 
-export interface Ok<T> {
-  is: 'ok'
-  ok: T
-  err?: never
-}
-
-export interface Err<E> {
-  is: 'err'
-  ok?: never
-  err: E
-}
-
-export function err<E>(err: E) {
-  return {
-    is: 'err' as 'err',
-    err
-  }
-}
-
-export function ok<T>(ok: T) {
-  return {
-    is: 'ok' as 'ok',
-    ok
-  }
-}
-
-export type Result<T, E=any> = Ok<T> | Err<E>
-
-const EXPECTED_VALUE = 'NonNull type received null'
-
 export type Maybe<T> = T | null | undefined
 export type Must<T> = Exclude<T, null | undefined>
 
 const isNullNode = (n: any): n is NullValueNode => n.kind === 'NullValue'
+
+
+import ERROR, { isErr, isOk, ok, Result, sift } from './err'
+
+const EReadField = ERROR `ReadField` (
+  (props: { name: string }) => `could not read field "${props.name}"`
+)
+
+const EReadObject = ERROR `ReadObject` (
+  ({ }) => `could not read object`
+)
+
+const EBadReadNode = ERROR `BadReadNode` (
+  (props: { expected: string, node: Maybe<ASTNode> }) =>
+    `expected node of type ${props.expected}, got ${props.node?.kind}`
+)
+
 
 export class Slot<T, I extends ASTNode, O extends ValueNode>
   implements
@@ -116,7 +103,7 @@ export class Slot<T, I extends ASTNode, O extends ValueNode>
       deserialize: {
         value(node: Maybe<I>): Result<Must<T>> {
           const result = deserialize(node)
-          if (result.ok == null)
+          if (!isErr(result) && result.ok == null)
             return ok(defaultValue)
           return result as Result<Must<T>>
         }
@@ -162,12 +149,17 @@ export function scalar<T, K extends ScalarKind>(
   )
 }
 
+const EReadNaN = ERROR `ReadNaN`
+  ((props: { repr: string }) => `"${props.repr}" decoded to NaN`)
+const EReadIntRange = ERROR `ReadIntRange`
+  ((props: { repr: string }) => `"${props.repr}" out of range for integers`)
+
 export const int = scalar(
   'IntValue',
   repr => {
     const decoded = +repr
-    if (Number.isNaN(decoded)) return err('NaN')
-    if (!Number.isSafeInteger(decoded)) return err('Int out of range')
+    if (Number.isNaN(decoded)) return EReadNaN({ repr })
+    if (!Number.isSafeInteger(decoded)) EReadIntRange({ repr })
     return ok(decoded)
   }
 )
@@ -176,7 +168,7 @@ export const float = scalar(
   'FloatValue',
   repr => {
     const decoded = +repr
-    if (Number.isNaN(decoded)) return err('NaN')
+    if (Number.isNaN(decoded)) return EReadNaN({ repr })
     return ok(decoded)
   }
 )
@@ -216,31 +208,35 @@ function must<S extends Slot<any, any, any>>(type: S):
     deserialize: {
       value(node: Maybe<Serialized<S>>): Result<Must<Deserialized<S>>> {
         if (!node || isNullNode(node))
-          return err(EXPECTED_VALUE)
+          return EBadReadNode({ node: node!, expected: '(non-null)' })
         const underlying = deserialize(node)
-        if (underlying.ok == null && !underlying.err)
-          return err(EXPECTED_VALUE)
+        if (!isErr(underlying) && underlying.ok == null)
+          return EBadReadNode({ node: node!, expected: '(non-null)' })
         return underlying
       }
     }
   })
 }
 
+const EReadList = ERROR `ReadList` (() => `error reading list`)
+
 export function list<T, V extends ValueNode>(type: Serde<T, V>) {
   return slot<T[], ListValueNode>(
     (values: T[] = []) => ({
       kind: 'ListValue' as 'ListValue',
-      values: values.map(v => type.serialize(v)).filter(hasValue)
+      values: values.map(v => type.serialize(v))
     }) as any,
     (node: Maybe<ListValueNode>) => {
       const results = ((node as ListValueNode)?.values ?? [])
         .map(v => type.deserialize(v as any))
-      const errors = results.filter(r => !!r.err)
-      if (errors.length) return err(errors)
-      return ok(results.filter(r => !r.err).map(r => r.ok!))
+      const [errors, okays] = sift(results)
+      if (errors.length) return EReadList({ node }, ...errors)
+      return ok(okays)
     }
   )
 }
+
+
 
 export interface ObjShape {
   [key: string]: Serde<any, any>
@@ -267,7 +263,7 @@ export function obj<S extends ObjShape>(shape: S):
     },
     (node: Maybe<ObjectValueNode | NullValueNode | DirectiveNode>) => {
       if (!isMetadataTarget(node))
-        return err('Expected object or directive')
+        return EBadReadNode({ node, expected: 'ObjectValueNode | DirectiveNode' })
       const md = metadata(node)
       const results = Object.entries(shape)
         .map(([name, type]) => ({
@@ -275,47 +271,21 @@ export function obj<S extends ObjShape>(shape: S):
           field: md[name],
           result: type.deserialize(md[name])
         }))
-      const errors = results.filter(({ result }) => result.err)
-        .map(({ name, field, result }) =>
-          new FieldErr(name, field, result.err))
-      if (errors.length) return err(errors)
-
-      const shaped = Object.fromEntries(
-        results.map(({ name, result }) => [name, result.ok])
-      ) as any
-      return ok(shaped)
+      const errors = []
+      const entries = []
+      for (const {name, field, result} of results) {
+        if (isErr(result))
+          errors.push(EReadField({
+            name,
+            node: field
+          }, result))
+        if (isOk(result))
+          entries.push([name, result.ok])
+      }
+      if (errors.length) return EReadObject({ node }, ...errors)
+      return ok(Object.fromEntries(entries))
     }
   )
-}
-
-abstract class NodeErr {
-  abstract readonly code: string
-  abstract readonly message: string
-
-  toString() {
-    return this.message
-  }
-}
-
-class ObjErr {
-  constructor(
-    public readonly obj: ASTNode,
-    public readonly cause: any,
-  ) {}
-}
-
-class FieldErr {
-  constructor(
-    public readonly name: string,
-    public readonly field: ASTNode,
-    public readonly cause: any
-  ) {}
-
-
-
-  toString() {
-    return `${mapSource(this.field.loc)}: could not deserialize ${this.name}: ${this.cause.message}`
-  }
 }
 
 function serializeFields<

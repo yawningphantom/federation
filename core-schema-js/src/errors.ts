@@ -54,22 +54,5 @@ export function extending<B extends AnyCtor<any>>(Base: B) {
   }
 }
 
-// export function errors<E extends Formatters>(errors: E): ErrorsOf<E> {
-//   const created: any = {}
-//   for (const [code, message] of Object.entries(errors)) {
-//     const errClass = class extends Error {
-//       public static readonly code = code
-//       constructor(props: Props) { super(); Object.assign(this, props) }
-//       get message() {
-//         return message.apply(this, [this])
-//       }
-//       get code() { return code }
-//     }
-//     Object.defineProperty(errClass, 'name', { value: code + 'Error' })
-//     created[code] = errClass
-//   }
-//   return created as ErrorsOf<E>
-// }
-
 export const errors = Object.assign(extending(Error), {extending})
 export default errors

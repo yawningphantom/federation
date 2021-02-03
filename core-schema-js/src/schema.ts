@@ -6,6 +6,24 @@ import sourceMap, { asSource, AsSource, Source, SourceMap } from './source-map'
 import { Sel, select, Selection } from './proc'
 import { data, set } from './data'
 
+import ERROR, { isErr, isOk, Ok, sift } from './err'
+
+const ErrNoSchemas = ERROR `NoSchemas` (() =>
+  `core schemas must contain a GraphQL schema definition`
+)
+
+const ErrExtraSchema = ERROR `ExtraSchema` (() =>
+  `extra schema definition ignored`
+)
+
+const ErrNoCore = ERROR `NoCore` (() =>
+  `the first @core(using:) directive must reference the core spec itself`
+)
+
+const ErrBadUsingRequest = ERROR `BadUsingRequest` (() =>
+  `@core(using:) invalid`
+)
+
 export class Schema extends Sel implements Selection<Schema> {
   public static parse(...input: AsSource): Schema {
     return new Schema(asSource(input))
@@ -48,7 +66,7 @@ const document = data <DocumentNode, Source> `Document AST Node` .orElse(
  * Errors are reported on both the document node and the node on which
  * the error occurred
  */
-const errors = data <Error[], ASTNode> `Errors on each node`
+const errors = data <Err[], ASTNode> `Errors on each node`
   .orElse(() => [])
 
 /**
@@ -80,13 +98,13 @@ const theSchema =
             schema = def
             continue
           }
-          const error = new ExtraSchema(doc, def)
-          errors(doc).push(error)
+          const error = ErrExtraSchema({ doc, node: def })
           errors(def).push(error)
+          errors(doc).push(error)
         }
       }
       if (!schema) {
-        const error = new NoSchemas(doc)
+        const error = ErrNoSchemas({ doc })
         errors(doc).push(error)
       }
       return schema
@@ -94,7 +112,8 @@ const theSchema =
 
 
 import { core, Using } from './specs/core'
-import { metadata } from './metadata'
+import { Maybe, metadata } from './metadata'
+import { Err } from './err'
 
 const using =
   data <Using[], DocumentNode>
@@ -104,96 +123,62 @@ const using =
     if (!schema) return []
     const using = (schema.directives ?? [])
       .filter(d => 'using' in metadata(d))
-      .map(directive => ({
-        directive,
-        result: Using.deserialize(directive)
+      .map(d => ({
+        result: Using.deserialize(d),
+        directive: d
       }))
-    const fail = using
-      .map(r => r.result.err).filter(Boolean)
-    errors(doc).push(...fail)
-    const coreUse = using.find(u => !!u.result.ok)
-    if ((coreUse?.result.ok?.using.identity !== core.identity) ||
-        (coreUse?.directive.name.value !== (coreUse?.result.ok?.as ?? core.name))) {
-      errors(doc).push(new NoCore(doc, coreUse?.directive ?? schema))
+
+    const coreReq = using.find(d => isOk(d.result)) as {
+      result: Ok<Using>,
+      directive: DirectiveNode
+    }
+
+    if (!coreReq) {
+      errors(doc).push(ErrNoCore({ doc, node: schema }))
       return []
     }
-    const requests = using.filter(u => u.directive.name.value === coreUse.directive.name.value)
-    const bad = requests.filter(u => !!u.result?.err)
-    const good = requests.map(u => u.result.ok!).filter(Boolean)
+
+    const {result: {ok: coreUse}, directive} = coreReq
+
+    if (coreUse.using.identity !== core.identity ||
+        (directive.name.value !== (coreUse.as ?? core.name))) {
+      errors(doc).push(ErrNoCore({ doc, node: directive ?? schema }))
+      return []
+    }
+    const requests = using.filter(u => u.directive.name.value === directive.name.value)
+    const bad = requests.filter(u => isErr(u.result))
+    const good = requests.filter(u => isOk(u.result))
     errors(doc).push(
-      ...bad.map(bad => new InvalidRequest(doc, bad.directive, bad.result.err!))
+      ...bad.map(bad =>
+        ErrBadUsingRequest({ doc, node: bad.directive }, bad.result as Err))
     )
-    return good
+    return good.map(u => (u.result as Ok<Using>).ok)
   })
 
+const example = Schema.parse({
+  src: 'example.graphql',
+  text:
+    `
+      schema
+        @core(using: "https://lib.apollo.dev/core/v0.1")
+        @core(using: "https://lib.apollo.dev/core/v0.1")
+      {
+        query: Query
+      }
 
-abstract class SchemaError extends Error {
-  public static readonly code: string = 'UnknownSchemaError'
-
-  constructor(
-    public readonly document: DocumentNode,
-    public readonly node: ASTNode = document
-  ) {
-    super()
-  }
-
-  get code(): string {
-    return (this.constructor as any).code
-  }
-
-  get location(): string | null {
-    return formatLoc(source(this.document))(this.node.loc)
-  }
-
-  abstract get message(): string
-}
-
-export class NoSchemas extends SchemaError {
-  public static readonly code = 'NoSchemas'
-  public readonly message = `Core schemas must contain a GraphQL schema definition`
-}
-
-export class ExtraSchema extends SchemaError {
-  public static readonly code = 'ExtraSchema'
-
-  get message() {
-    return `${this.location}: extra schema definition ignored`
-  }
-}
-
-export class NoCore extends SchemaError {
-  public static readonly code = 'NoCore'
-  public readonly message = `${this.location}: the first @core(using:) directive must reference the core spec itself`
-}
-
-export class InvalidRequest extends SchemaError {
-  public static readonly code = 'InvalidRequest'
-  constructor(
-    public readonly doc: DocumentNode,
-    public readonly node: DirectiveNode,
-    public readonly cause: any
-  ) { super(doc, node) }
-
-  get message() {
-    console.log(this.cause)
-    return `${this.location}: invalid request (${this.cause})`
-  }
-}
-
-const example = Schema.parse `
-  schema
-    @core(using: "https://lib.apollo.dev/core/v0.1")
-    @core(using: "https://lib.apollo.dev/corez/v1")
-    @core(using: "https://lib.apollo.dev/core/v0.1")
-  {
-    query: Query
-  }
-
-  type Query {
-    value: Int
-  }
-`
+      type Query {
+        value: Int
+      }
+    `
+  })
   .ok()
 
 console.log(using(example.document))
-console.log(example.errors.map(x => x.message).join('\n'))
+example.errors.forEach((e, i) => {
+  console.log('error #', i)
+  console.log(e.toString(formatLoc(source(example.document))))
+})
+// for (const e of example.errors) {
+//   console.log('--- error', )
+// }
+// console.log(example.errors.map(x => x.toString()).join('\n'))

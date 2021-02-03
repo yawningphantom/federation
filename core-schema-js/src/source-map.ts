@@ -1,6 +1,7 @@
 import type { Location, ASTNode } from 'graphql'
 import search from 'binarysearch'
 import { asString, AsString, isAsString, isEmpty } from './is'
+import { Maybe } from './metadata'
 
 export interface Source {
   /// The filename or URL of this source
@@ -26,6 +27,8 @@ export function asSource(source: AsSource): Source {
 }
 
 const isNode = (o: any): o is ASTNode => typeof o?.kind === 'string'
+const locationFrom = (from?: Location | ASTNode): Maybe<Location> =>
+  (from && isNode(from)) ? from.loc : from
 
 export default function sourceMap(...input: AsSource | [undefined] | []): SourceMap {
   if (isEmpty(input) || !input[0]) return nullMap
@@ -36,7 +39,7 @@ export default function sourceMap(...input: AsSource | [undefined] | []): Source
   return describe
 
   function describe(from?: Location | ASTNode) {
-    const loc = (from && isNode(from)) ? from.loc : from
+    const loc = locationFrom(from)
     if (!loc) return `${src}:[unknown]`
     const line = search.closest(endings, loc.start)
     const col = loc.start - endings[line]
@@ -52,7 +55,7 @@ function *indexesOf(text: string, substr='\n') {
   }
 }
 
-const nullMap: SourceMap = (loc?: Location) =>
+const nullMap: SourceMap = (loc?: Location | ASTNode) =>
   loc
-    ? `<unknown source>[offset ${loc.start}]`
+    ? `<unknown source>[offset ${locationFrom(loc)?.start}]`
     : `<unknown source>[unknown]`

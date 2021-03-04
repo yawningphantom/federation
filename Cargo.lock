@@ -357,12 +357,15 @@ dependencies = [
  "gherkin_rust",
  "graphql-parser",
  "harmonizer",
+ "insta",
  "lazy_static",
  "linked-hash-map",
  "serde",
  "serde_json",
+ "thiserror",
  "tracing",
  "tracing-futures",
+ "using",
 ]
 
 [[package]]
@@ -3608,6 +3611,18 @@ dependencies = [
  "matches",
  "percent-encoding",
  "serde",
+]
+
+[[package]]
+name = "using"
+version = "0.1.0"
+dependencies = [
+ "graphql-parser",
+ "insta",
+ "lazy_static",
+ "regex",
+ "thiserror",
+ "url",
 ]
 
 [[package]]

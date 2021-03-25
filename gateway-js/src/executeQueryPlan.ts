@@ -22,7 +22,10 @@ import {
   ResponsePath,
   QueryPlanSelectionNode,
   QueryPlanFieldNode,
-  getResponseName
+  getResponseName,
+  SequenceNode,
+  FlattenNode,
+  ParallelNode
 } from '@apollo/query-planner';
 import { deepMerge } from './utilities/deepMerge';
 
@@ -79,6 +82,7 @@ export async function executeQueryPlan<TContext>(
   // only explicitly requested fields are included and field ordering follows
   // the original query.
   // It is also used to allow execution of introspection queries though.
+  if(queryPlan.node && queryPlan.node.kind != "Fetch")
   try {
     ({ data } = await execute({
       schema: operationContext.schema,

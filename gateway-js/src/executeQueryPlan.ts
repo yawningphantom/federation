@@ -22,10 +22,7 @@ import {
   ResponsePath,
   QueryPlanSelectionNode,
   QueryPlanFieldNode,
-  getResponseName,
-  SequenceNode,
-  FlattenNode,
-  ParallelNode
+  getResponseName
 } from '@apollo/query-planner';
 import { deepMerge } from './utilities/deepMerge';
 

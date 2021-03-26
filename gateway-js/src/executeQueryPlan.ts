@@ -75,11 +75,24 @@ export async function executeQueryPlan<TContext>(
     }
   }
 
+
+  // Field(node: FieldDefinitionNode) {
+  //   if (node.name.value === '__schema' || node.name.value === '__type') {
+  //     context.reportError(
+  //       new GraphQLError(
+  //         'GraphQL introspection is not allowed by Apollo Server, but the query contained __schema or __type. To enable introspection, pass introspection: true to ApolloServer in production',
+  //         [node],
+  //       ),
+  //     );
+  //   }
+  // }
+
+
   // FIXME: Re-executing the query is a pretty heavy handed way of making sure
   // only explicitly requested fields are included and field ordering follows
   // the original query.
   // It is also used to allow execution of introspection queries though.
-  if(queryPlan.node && queryPlan.node.kind != "Fetch")
+  if(!queryPlan.node || (queryPlan.node && queryPlan.node.kind != "Fetch"))
   try {
     ({ data } = await execute({
       schema: operationContext.schema,

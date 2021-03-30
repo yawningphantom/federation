@@ -1,7 +1,7 @@
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import nodePolyfills from 'rollup-plugin-node-polyfills';
-import { getBabelOutputPlugin } from '@rollup/plugin-babel';
+// import { getBabelOutputPlugin } from '@rollup/plugin-babel';
 import path from 'path';
 
 export default [
@@ -10,7 +10,7 @@ export default [
     output: {
       name: 'composition',
       file: path.resolve(__dirname, './dist/composition.js'),
-      format: 'esm',
+      format: 'iife',
       globals: {
         // This must be mocked in the runtime as an
         // empty object. e.g., `node_fetch_1={}`.
@@ -27,25 +27,25 @@ export default [
       nodePolyfills(),
       resolve(),
       commonjs(),
-      getBabelOutputPlugin({
-        presets: [
-          [
-            "@babel/preset-env",
-            {
-              targets: "",
-            }
-          ]
-        ],
-        plugins: [
-          [
-            "babel-plugin-transform-modules-iife",
-            {
-              importNameSpace: 'Jesse',
-              exportNamespace: 'Harmonizer',
-            }
-          ]
-        ],
-      }),
+      // getBabelOutputPlugin({
+      //   presets: [
+      //     [
+      //       "@babel/preset-env",
+      //       {
+      //         targets: "",
+      //       }
+      //     ]
+      //   ],
+      //   plugins: [
+      //     [
+      //       "babel-plugin-transform-modules-iife",
+      //       {
+      //         importNameSpace: 'Jesse',
+      //         exportNamespace: 'Harmonizer',
+      //       }
+      //     ]
+      //   ],
+      // }),
     ],
   }
 ];

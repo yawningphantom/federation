@@ -29,8 +29,7 @@ composition implementation while we work toward something else.
 #![forbid(unsafe_code)]
 #![deny(missing_debug_implementations, nonstandard_style)]
 #![warn(missing_docs, future_incompatible, unreachable_pub, rust_2018_idioms)]
-use deno_core::Op;
-use deno_core::{json_op_sync, JsRuntime};
+use quick_js::{Context, JsValue};
 use serde::{Deserialize, Serialize};
 use std::sync::mpsc::channel;
 use std::{fmt::Display, io::Write};

@@ -6,8 +6,10 @@ extern crate derive_builder;
 
 use crate::builder::build_query_plan;
 use crate::model::QueryPlan;
+use graphql_parser::query::Document;
 use graphql_parser::{parse_query, parse_schema, schema, ParseError};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[macro_use]
 mod macros;
@@ -31,20 +33,64 @@ pub enum QueryPlanError {
 pub type Result<T> = std::result::Result<T, QueryPlanError>;
 
 #[derive(Debug)]
+pub struct Cache<'a> {
+    document_cache: HashMap<String, &'a Document<'a>>,
+    query_plan_cache: HashMap<String, &'a QueryPlan>,
+}
+
+impl<'a> Cache<'a> {
+    pub fn new(
+        document_cache: HashMap<String, &'a Document<'a>>,
+        query_plan_cache: HashMap<String, &'a QueryPlan>,
+    ) -> Self {
+        Self {
+            document_cache,
+            query_plan_cache,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct QueryPlanner<'s> {
     pub schema: schema::Document<'s>,
+    pub cache: Cache<'s>,
 }
 
 impl<'s> QueryPlanner<'s> {
     pub fn new(schema: &'s str) -> QueryPlanner<'s> {
         let schema = parse_schema(schema).expect("failed parsing schema");
-        QueryPlanner { schema }
+        let cache = Cache::new(HashMap::new(), HashMap::new());
+        QueryPlanner { schema, cache }
     }
 
     // TODO(ran) FIXME: make options a field on the planner.
-    pub fn plan(&self, query: &str, options: QueryPlanningOptions) -> Result<QueryPlan> {
-        let query = parse_query(query).expect("failed parsing query");
-        build_query_plan(&self.schema, &query, options)
+    pub fn plan(&mut self, query: &'s str, options: QueryPlanningOptions) -> Result<QueryPlan> {
+        let iquery: Document;
+        if self.cache.document_cache.contains_key(query) {
+            // read from cache
+            iquery = self
+                .cache
+                .document_cache
+                .get(query)
+                .cloned()
+                .cloned()
+                .unwrap();
+        } else {
+            iquery = parse_query(query).expect("failed parsing query");
+            // add to cache
+            self.cache.document_cache.insert(query.to_owned(), &iquery);
+        }
+
+        if self.cache.query_plan_cache.contains_key(query) {
+            self.cache
+                .query_plan_cache
+                .get(query)
+                .cloned()
+                .cloned()
+                .ok_or(QueryPlanError::InvalidQuery("cache failure"))
+        } else {
+            build_query_plan(&self.schema, &iquery, options)
+        }
     }
 }
 

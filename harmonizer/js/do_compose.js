@@ -30,27 +30,10 @@ serviceList.some((service) => {
 });
 
 serviceList = serviceList.map(({ typeDefs, ...rest }) => ({
-  typeDefs: parseTypedefs(typeDefs),
+  typeDefs: composition.parseGraphqlDocument(typeDefs),
   ...rest,
 }));
 
-function parseTypedefs(source) {
-  try {
-    return composition.parseGraphqlDocument(source)    
-  } catch (err) {
-    // Return the error in a way that we know how to handle it.
-    done({ Err: [err] });
-  }
-}
-
-try {
-  /**
-   * @type {{ errors: Error[], supergraphSdl?: undefined } | { errors?: undefined, supergraphSdl: string; }}
-   */
-  const composed = composition.composeAndValidate(serviceList);
-  done(
-    composed.errors ? { Err: composed.errors } : { Ok: composed.supergraphSdl },
-  );
-} catch (err) {
-  done({ Err: [err] });
-}
+// This is super important to be the last element to make sure we don't try to
+// deserialize the serviceList (above) in Rust, which is ... complex.
+null;

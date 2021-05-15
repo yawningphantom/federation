@@ -12,8 +12,9 @@ Immediately Invoked Function Expression ([IIFE]) that is created by running the
 When the [`harmonize`] function that this crate provides is called with a
 [`ServiceList`] (which is synonymous with the terminology and service list
 notion that exists within the JavaScript composition library), this crate uses
-[`deno_core`] to invoke the JavaScript within V8.  This is ultimately
-accomplished using [`rusty_v8`]'s V8 bindings to V8.
+[`quick-js`] to invoke the JavaScript in the [QuickJS Engine].  We previously
+attempted to do this using V8 (via [`deno_core`] and [`rusty_v8`]), but that
+resulted in problems running on Musl-based C libraries.
 
 While we intend for a future version of composition to be done natively within
 Rust, this allows us to provide a more stable transition using an already stable
@@ -22,17 +23,17 @@ composition implementation while we work toward something else.
 [`@apollo/federation`]: https://npm.im/@apollo/federation
 [IIFE]: https://developer.mozilla.org/en-US/docs/Glossary/IIFE
 [Rollup.js]: http://rollupjs.org/
+[`quick-js`]: https://crates.io/crates/quick-js
+[QuickJS Engine]: https://bellard.org/quickjs/
 [`deno_core`]: https://crates.io/crates/deno_core
-[`rusty_v8`]: https://crates.io/crates/rusty_v8
 */
 
 #![forbid(unsafe_code)]
 #![deny(missing_debug_implementations, nonstandard_style)]
 #![warn(missing_docs, future_incompatible, unreachable_pub, rust_2018_idioms)]
-use deno_core::{op_sync, JsRuntime};
+use quick_js::Context;
 use serde::{Deserialize, Serialize};
-use std::sync::mpsc::channel;
-use std::{fmt::Display, io::Write};
+use std::fmt::Display;
 use thiserror::Error;
 
 /// The `ServiceDefinition` represents everything we need to know about a
@@ -146,69 +147,14 @@ impl CompositionError {
 ///
 pub fn harmonize(service_list: ServiceList) -> Result<String, Vec<CompositionError>> {
     // Initialize a runtime instance
-    let mut runtime = JsRuntime::new(Default::default());
+    let context = Context::builder()
+        .console(quick_js::console::LogConsole)
+        .build()
+        .unwrap();
 
-    // We'll use this channel to get the results
-    let (tx, rx) = channel();
-
-    // The first thing we do is define an op so we can print data to STDOUT,
-    // because by default the JavaScript console functions are just stubs (they
-    // don't do anything).
-
-    // Register the op for outputting bytes to stdout. It can be invoked with
-    // Deno.core.dispatch and the id this method returns or
-    // Deno.core.dispatchByName and the name provided.
-    runtime.register_op(
-        "op_print",
-        // The op_fn callback takes a state object OpState,
-        // a structured arg of type `T` and an optional ZeroCopyBuf,
-        // a mutable reference to a JavaScript ArrayBuffer
-        op_sync(|_state, _msg: Option<String>, zero_copy| {
-            let mut out = std::io::stdout();
-
-            // Write the contents of every buffer to stdout
-            if let Some(buf) = zero_copy {
-                out.write_all(&buf)
-                    .expect("failure writing buffered output");
-            }
-
-            Ok(()) // No meaningful result
-        }),
-    );
-
-    runtime.register_op(
-        "op_composition_result",
-        op_sync(move |_state, value, _zero_copy| {
-            tx.send(serde_json::from_value(value).expect("deserializing composition result"))
-                .expect("channel must be open");
-
-            Ok(serde_json::json!(null))
-
-            // Don't return anything to JS
-        }),
-    );
-
-    // The runtime automatically contains a Deno.core object with several
-    // functions for interacting with it.
-    runtime
-        .execute(
-            "<init>",
+    context
+        .eval(
             r#"
-// First we initialize the ops cache.
-// This maps op names to their id's.
-Deno.core.ops();
-
-// Then we define a print function that uses
-// our op_print op to display the stringified argument.
-const _newline = new Uint8Array([10]);
-function print(value) {
-  Deno.core.dispatchByName('op_print', 0, value.toString(), _newline);
-}
-
-function done(result) {
-  Deno.core.opSync('op_composition_result', result);
-}
-
 // We build some of the preliminary objects that our Rollup-built package is
 // expecting to be present in the environment.
 // node_fetch_1 is an unused external dependency we don't bundle.  See the
@@ -224,32 +170,35 @@ process = { env: { "NODE_ENV": "production" }};
 // need to be initialized as empty objects.
 global = {};
 exports = {};
-"#,
+    "#,
         )
         .expect("unable to initialize composition runtime environment");
 
     // Load the composition library.
-    runtime
-        .execute("composition.js", include_str!("../dist/composition.js"))
+    context
+        .eval(include_str!("../dist/composition.js"))
         .expect("unable to evaluate composition module");
 
-    // We literally just turn it into a JSON object that we'll execute within
-    // the runtime.
+    // We turn services into a JSON object that we'll execute in the runtime
     let service_list_javascript = format!(
         "serviceList = {}",
         serde_json::to_string(&service_list)
             .expect("unable to serialize service list into JavaScript runtime")
     );
 
-    runtime
-        .execute("<set_service_list>", &service_list_javascript)
+    context
+        .eval(&service_list_javascript)
         .expect("unable to evaluate service list in JavaScript runtime");
 
-    runtime
-        .execute("do_compose.js", include_str!("../js/do_compose.js"))
+    context
+        .eval(include_str!("../js/do_compose.js"))
         .expect("unable to invoke composition in JavaScript runtime");
 
-    rx.recv().expect("channel remains open")
+    let value = context
+        .eval_as::<String>("composition.composeAndValidate(serviceList).supergraphSdl")
+        .expect("Nah");
+
+    Ok(value)
 }
 
 #[cfg(test)]

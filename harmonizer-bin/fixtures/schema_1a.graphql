@@ -1,0 +1,4 @@
+# Repeated in schema_1b
+type Query {
+  field: String
+}

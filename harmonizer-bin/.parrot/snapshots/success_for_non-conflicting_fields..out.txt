@@ -1,0 +1,29 @@
+schema
+  @core(feature: "https://specs.apollo.dev/core/v0.1"),
+  @core(feature: "https://specs.apollo.dev/join/v0.1")
+{
+  query: Query
+}
+
+directive @core(feature: String!) repeatable on SCHEMA
+
+directive @join__field(graph: join__Graph, requires: join__FieldSet, provides: join__FieldSet) on FIELD_DEFINITION
+
+directive @join__type(graph: join__Graph!, key: join__FieldSet) repeatable on OBJECT | INTERFACE
+
+directive @join__owner(graph: join__Graph!) on OBJECT | INTERFACE
+
+directive @join__graph(name: String!, url: String!) on ENUM_VALUE
+
+scalar join__FieldSet
+
+enum join__Graph {
+  SCHEMA_3A @join__graph(name: "schema_3a" url: "./fixtures/schema_3a.graphql")
+  SCHEMA_3B @join__graph(name: "schema_3b" url: "./fixtures/schema_3b.graphql")
+}
+
+type Query {
+  field_1: String @join__field(graph: SCHEMA_3A)
+  field_2: String @join__field(graph: SCHEMA_3B)
+}
+

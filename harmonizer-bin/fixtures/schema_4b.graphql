@@ -1,0 +1,7 @@
+type Query {
+  ages: [Int!]!
+}
+
+extend type User {
+  age: Int!
+}

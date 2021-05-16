@@ -1,0 +1,7 @@
+5 errors occurred during composition:
+  1. KEY_FIELDS_MISSING_EXTERNAL: [schema_5b] User -> A @key directive specifies the `age` field which has no matching @external field.
+  2. UNKNOWN: [schema_5b] User.id -> Field "User.id" already exists in the schema. It cannot also be defined in this type extension. If this is meant to be an external field, add the `@external` directive.
+  3. KEY_FIELDS_MISSING_ON_BASE: [schema_5a] User -> A @key selects id, but User.id was either created or overwritten by schema_5b, not schema_5a
+  4. KEY_FIELDS_MISSING_ON_BASE: [schema_5b] User -> A @key selects age, but User.age was either created or overwritten by schema_5b, not schema_5b
+  5. KEY_NOT_SPECIFIED: [schema_5b] User -> extends from schema_5a but specifies an invalid @key directive. Valid @key directives are specified by the originating type. Available @key directives for this type are:
+	@key(fields: "id")

@@ -1,0 +1,8 @@
+type Query {
+  ages: [Int!]!
+}
+
+extend type User @key(fields: "age") {
+  id: ID!
+  age: Int!
+}

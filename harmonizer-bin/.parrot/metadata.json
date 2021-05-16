@@ -1,0 +1,49 @@
+{
+  "snapshots": [
+    {
+      "cmd": "cargo run -q -- ./fixtures/schema_1a.graphql ./fixtures/schema_1b.graphql",
+      "name": "duplicate_fields",
+      "description": "When there are duplicate fields, it should error.",
+      "tags": [],
+      "exit_code": 0,
+      "stdout": null,
+      "stderr": "duplicate_fields.err"
+    },
+    {
+      "cmd": "cargo run -q -- ./fixtures/schema_2a.graphql",
+      "name": "parse_error",
+      "description": "parse error shouldn't work",
+      "tags": [],
+      "exit_code": 0,
+      "stdout": null,
+      "stderr": "parse_error.err"
+    },
+    {
+      "cmd": "cargo run -q -- ./fixtures/schema_3a.graphql ./fixtures/schema_3b.graphql",
+      "name": "success_for_non-conflicting_fields.",
+      "description": null,
+      "tags": [],
+      "exit_code": 0,
+      "stdout": "success_for_non-conflicting_fields..out",
+      "stderr": null
+    },
+    {
+      "cmd": "cargo run -q -- ./fixtures/schema_4a.graphql ./fixtures/schema_4b.graphql",
+      "name": "multiple_subgraphs_with_extensions_work",
+      "description": null,
+      "tags": [],
+      "exit_code": 0,
+      "stdout": "multiple_subgraphs_with_extensions_work.out",
+      "stderr": null
+    },
+    {
+      "cmd": "cargo run -q -- ./fixtures/schema_5a.graphql ./fixtures/schema_5b.graphql",
+      "name": "mismatched_keys",
+      "description": null,
+      "tags": [],
+      "exit_code": 0,
+      "stdout": null,
+      "stderr": "mismatched_keys.err"
+    }
+  ]
+}

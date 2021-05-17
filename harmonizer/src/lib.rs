@@ -31,7 +31,7 @@ composition implementation while we work toward something else.
 #![forbid(unsafe_code)]
 #![deny(missing_debug_implementations, nonstandard_style)]
 #![warn(missing_docs, future_incompatible, unreachable_pub, rust_2018_idioms)]
-use quick_js::Context;
+use quick_js::{Context, JsValue, ValueError};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use thiserror::Error;
@@ -102,6 +102,61 @@ impl Display for CompositionError {
         }
     }
 }
+
+#[derive(Debug, Error, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+/// The result of running composition, possibly with errors.
+///
+/// Either of the properties may be present or absent.  It's expected that
+/// without `errors` there be a `supergraph_sdl`.
+pub struct CompositionResult {
+    /// If present, there were errors during composition
+    // pub errors: Option<Vec<CompositionError>>,
+    /// This is the string representation of the supergraph (core) schema.
+    pub supergraph_sdl: Option<String>,
+}
+
+impl Display for CompositionResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(_result) = &self.supergraph_sdl  {
+            f.write_str("")
+        } else {
+            f.write_fmt(format_args!("composition error?"))
+        }
+    }
+}
+
+
+// impl From<CompositionResult> for JsValue {
+//     fn from(value: CompositionResult) -> Self {
+//         JsValue::String(value.supergraph_sdl)
+//     }
+// }
+
+impl std::convert::TryFrom<JsValue> for CompositionResult {
+    type Error = ValueError;
+
+    fn try_from(value: JsValue) -> Result<Self, Self::Error> {
+        match value {
+            JsValue::Object(_inner) => Ok(CompositionResult {
+                supergraph_sdl: Some(String::from("fuck")),
+                // errors: Some(vec![]),
+            }),
+            _ => Err(ValueError::UnexpectedType)
+        }
+
+    }
+}
+
+// impl Display for CompositionResult {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         if let Some(msg) = &self.message {
+//             f.write_fmt(format_args!("{code}: {msg}", code = self.code(), msg = msg))
+//         } else {
+//             f.write_str(self.code())
+//         }
+//     }
+// }
 
 /// Mimicking the JavaScript-world from which this error comes, this represents
 /// the `extensions` property of a JavaScript [`GraphQLError`] from the
@@ -194,11 +249,22 @@ exports = {};
         .eval(include_str!("../js/do_compose.js"))
         .expect("unable to invoke composition in JavaScript runtime");
 
-    let value = context
-        .eval_as::<String>("composition.composeAndValidate(serviceList).supergraphSdl")
-        .expect("Nah");
+    let value: String = context
+        .eval_as(r#"
+          // Save only what we can reasonably deserialize.
+          const { errors, supergraphSdl } = composition.composeAndValidate(serviceList);
+          // Return just that.
+          { supergraphSdl };
+          supergraphSdl || "";
+        "#)
+        .expect("unable to invoke composition");
 
+    // match value.supergraph_sdl {
     Ok(value)
+    // match value {
+    //     Some(value) => Ok(value),
+    //     None => Ok(String::from("maybe"))
+    // }
 }
 
 #[cfg(test)]

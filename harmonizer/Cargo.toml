@@ -16,7 +16,8 @@ include = ["dist/**/*", "js/**/*", "src/**/*", "Cargo.toml"]
 
 [dependencies]
 anyhow = "1.0.39"
-quick-js = { version = "0.4.1", features = ["log"] }
+# quick-js = { version = "0.4.1", features = ["log"] }
+quick-js = { git = "https://github.com/patr0nus/quickjs-rs.git", features = ["log"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.60"
 thiserror = "1.0.23"

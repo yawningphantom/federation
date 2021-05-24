@@ -6,7 +6,7 @@
 
 - Take subtypes into account when matching type conditions to extract representations. [PR #804](https://github.com/apollographql/federation/pull/804)
 - Fixes bug where one `onSchemaChange` listener throwing would prevent other `onSchemaChange` listeners from being notified. [PR #738](https://github.com/apollographql/federation/pull/738)
-- Adds `onSchemaLoadOrUpdate` method to register listeners for schema load and updates, and to receive both the API schema and the core supergraph SDL. `onSchemaChange` has been deprecated in favor of this method. [PR #738](https://github.com/apollographql/federation/pull/738)
+- Adds `onSchemaLoadOrUpdate` method to register listeners for schema load and updates, and to receive both the API schema and the core supergraph SDL. `onSchemaChange` has been deprecated in favor of this method. Note that `onSchemaChange` listeners are not notified when loading schemas from static gateway configurations, while `onSchemaLoadOrUpdate` listeners are notified. [PR #738](https://github.com/apollographql/federation/pull/738)
 
 ## v0.29.0
 

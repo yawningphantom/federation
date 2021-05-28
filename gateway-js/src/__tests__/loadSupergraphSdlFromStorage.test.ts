@@ -30,7 +30,7 @@ describe('loadSupergraphSdlFromStorage', () => {
 
   it('fetches Supergraph SDL as expected', async () => {
     mockSupergraphSdlRequestSuccess();
-    mockOutOfBandReportRequestSuccess();
+
     const fetcher = getDefaultFetcher();
     const result = await loadSupergraphSdlFromStorage({
       graphId,
@@ -379,7 +379,7 @@ describe('loadSupergraphSdlFromStorage', () => {
       );
     });
 
-    it("throws on timeout status response and successfully submits an out of band error", async () => {
+    it('throws on timeout status response and successfully submits an out of band error', async () => {
       cleanUp = mockedEnv({
         APOLLO_OUT_OF_BAND_REPORTER_ENDPOINT: mockOutOfBandReporterUrl,
       });
@@ -397,7 +397,7 @@ describe('loadSupergraphSdlFromStorage', () => {
           fetcher,
         }),
       ).rejects.toThrowErrorMatchingInlineSnapshot(
-        `"An error occurred while fetching your schema from Apollo: 500 Internal Server Error"`,
+        `"An error occurred while fetching your schema from Apollo: 408 Request Timeout"`,
       );
     });
   });

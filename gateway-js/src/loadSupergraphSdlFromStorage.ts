@@ -156,12 +156,24 @@ export async function loadSupergraphSdlFromStorage({
 
   const startTime = new Date()
   try {
-    console.log(request.url)
-    result = await fetcher(request);
+    result = await fetcher(endpoint, {
+      method: 'POST',
+      body: JSON.stringify({
+        query: SUPERGRAPH_SDL_QUERY,
+        variables: {
+          ref: `${graphId}@${graphVariant}`,
+          apiKey,
+        },
+      }),
+      headers: [
+        ['apollographql-client-name', name],
+        ['apollographql-client-version', version],
+        ['user-agent', `${name}/${version}`],
+        ['content-type', 'application/json'],
+      ],
+    });
   } catch (e) {
     const endTime = new Date();
-    console.log(e)
-
     submitOutOfBandReport({
       error: e,
       request,

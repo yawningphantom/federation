@@ -1010,3 +1010,56 @@ it('composition of full-SDL schemas without any errors', () => {
   const compositionResult = composeAndValidate([serviceA, serviceB]);
   expect(!compositionHasErrors(compositionResult));
 });
+
+it('TODO', () => {
+  const serviceA = {
+    typeDefs: gql`
+      extend type Query {
+        things: [Thing]
+      }
+
+      type Thing @key(fields: "id") {
+        id: String
+        foo: String
+      }
+    `,
+    name: 'serviceA',
+  };
+
+  const serviceB = {
+    typeDefs: gql`
+      extend type Query {
+        thing: Thing
+      }
+
+      extend type Thing @key(fields: "id") {
+        id: String @external
+        bar: String
+      }
+
+      extend type Thang {
+        id: String
+        foo: String
+      }
+    `,
+    name: 'serviceB',
+  };
+
+  const { supergraphSdl, errors } = composeAndValidate([serviceA, serviceB]);
+
+  expect(supergraphSdl).toBeUndefined();
+  expect(errors).toMatchInlineSnapshot(`
+    Array [
+      Object {
+        "code": "EXTENSION_WITH_NO_BASE",
+        "locations": Array [
+          Object {
+            "column": 1,
+            "line": 11,
+          },
+        ],
+        "message": "[serviceB] Thang -> \`Thang\` is an extension type, but \`Thang\` is not defined in any service",
+      },
+    ]
+  `);
+});
